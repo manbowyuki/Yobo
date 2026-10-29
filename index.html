@@ -1008,7 +1008,7 @@ function renderPreview(){
   if($('#p-preview').hidden)return;
   const ks=selectedPages();
   $('#pages').innerHTML=ks.length?ks.map(k=>`<div class="pwrap">${buildPage(k)}</div>`).join(''):'<p class="empty">出力するページを選んでください。</p>';
-  fitPages();
+  fitPages();warmPdf();
 }
 function fitPages(){
   $$('#pages .pwrap').forEach(w=>{
@@ -1104,27 +1104,55 @@ async function runPdf(btn,after){
 const pdfName=()=>(fileBase()||'要望シート')+'.pdf';
 function savePdf(){return runPdf($('#btnSharePdf'),blob=>saveFile(pdfName(),blob))}
 /* 共有：ファイルだけを渡す（URL・本文は付けない） */
-let pendingShare=null;
-function canShareFiles(){
-  try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'])],'a.pdf',{type:'application/pdf'})]}))}catch(e){return false}
+/* PDFを先に作っておき、タップの瞬間に共有画面を開く（iPhoneは待たされると共有を拒否するため） */
+let pdfCache={key:'',file:null},pdfJob=null,warmTimer=0,pendingShare=null;
+function pdfKey(){return pdfName()+'|'+selectedPages().map(buildPage).join('')}
+function ensurePdfFile(){
+  const key=pdfKey();
+  if(pdfCache.key===key&&pdfCache.file)return Promise.resolve(pdfCache.file);
+  if(pdfJob&&pdfJob.key===key)return pdfJob.p;
+  const p=makePdf().then(b=>{const f=new File([b],pdfName(),{type:'application/pdf'});pdfCache={key,file:f};return f})
+    .finally(()=>{if(pdfJob&&pdfJob.key===key)pdfJob=null});
+  pdfJob={key,p};
+  return p;
+}
+function warmPdf(){
+  clearTimeout(warmTimer);
+  if($('#p-preview').hidden||!selectedPages().length)return;
+  warmTimer=setTimeout(()=>{ensurePdfFile().catch(()=>{})},1200);
+}
+function canShareFile(f){
+  try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}))}catch(e){return false}
 }
 async function doShare(file){
   try{await navigator.share({files:[file]});return 'ok'}
   catch(e){return (e&&e.name==='AbortError')?'cancel':(e&&e.name==='NotAllowedError')?'gesture':'error'}
 }
 function sharePdf(){
-  if(!canShareFiles())return savePdf();
   const btn=$('#btnSharePdf');
-  if(pendingShare){
-    const f=pendingShare;pendingShare=null;btn.innerHTML=btn.dataset.label;
-    return doShare(f).then(r=>{if(r==='error')toast('共有できませんでした。もう一度お試しください')});
+  if(pdfBusy)return;
+  if(!selectedPages().length){toast('出力するページを選んでください');return}
+  // 準備済みなら、待たずにそのまま共有画面を開く
+  if(pdfCache.file&&pdfCache.key===pdfKey()){
+    const f=pdfCache.file;
+    if(!canShareFile(f)){toast('このブラウザは共有に対応していないため、保存します');return saveFile(f.name,f)}
+    return doShare(f).then(r=>{
+      if(r==='error'){toast('共有できなかったため、保存します');return saveFile(f.name,f)}
+    });
   }
-  btn.dataset.label=btn.innerHTML;
-  return runPdf(btn,async blob=>{
-    const file=new File([blob],pdfName(),{type:'application/pdf'});
-    const r=await doShare(file);
-    if(r==='gesture'){pendingShare=file;toast('PDFができました。もう一度タップして共有してください');setTimeout(()=>{btn.innerHTML='PDFができました。タップして共有'},0)}
-    else if(r==='error')toast('共有できませんでした。もう一度お試しください');
+  // 未準備：作ってから共有（拒否されたらもう一度タップで共有）
+  pdfBusy=true;
+  const label=btn.innerHTML;
+  btn.disabled=true;btn.textContent='PDFを作成中…';
+  return ensurePdfFile().then(async f=>{
+    btn.disabled=false;btn.innerHTML=label;pdfBusy=false;
+    if(!canShareFile(f)){toast('このブラウザは共有に対応していないため、保存します');return saveFile(f.name,f)}
+    const r=await doShare(f);
+    if(r==='gesture')toast('PDFができました。もう一度「PDFで共有」を押してください');
+    else if(r==='error'){toast('共有できなかったため、保存します');return saveFile(f.name,f)}
+  }).catch(()=>{
+    btn.disabled=false;btn.innerHTML=label;pdfBusy=false;
+    toast('PDFを作成できませんでした。通信状況を確認してください');
   });
 }
 $('#btnSharePdf').addEventListener('click',sharePdf);
