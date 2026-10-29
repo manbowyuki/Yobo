@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>要望シートメーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700;900&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: 卓（ミキサー）の作業台。上に公演情報、タブの下で「曲ライブラリのレール＋セットリストのチャンネル列」を並べ替える。出力はいつも白いA4紙面。 */
+:root{
+  --bg:#e9ecf0; --panel:#ffffff; --panel-2:#f3f5f8; --ink:#14171c; --muted:#586170; --line:#cfd5dd;
+  --accent:#2c47f0; --accent-ink:#ffffff; --accent-soft:#e1e6ff;
+  --ok:#0f7a58; --ok-bg:#dcf2e8; --warn:#8a4f00; --warn-bg:#fcebc5; --bad:#b3261e; --bad-bg:#fbe0dc;
+  --f-body:"Noto Sans JP","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  --f-head:"Zen Kaku Gothic New","Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1217; --panel:#171b22; --panel-2:#1e232b; --ink:#e7eaef; --muted:#9aa3b0; --line:#2e3540;
+    --accent:#8497ff; --accent-ink:#0a0e2c; --accent-soft:#232b57;
+    --ok:#52caa0; --ok-bg:#12302a; --warn:#f2b552; --warn-bg:#35280e; --bad:#ff8a82; --bad-bg:#3a1b19;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1217; --panel:#171b22; --panel-2:#1e232b; --ink:#e7eaef; --muted:#9aa3b0; --line:#2e3540;
+  --accent:#8497ff; --accent-ink:#0a0e2c; --accent-soft:#232b57;
+  --ok:#52caa0; --ok-bg:#12302a; --warn:#f2b552; --warn-bg:#35280e; --bad:#ff8a82; --bad-bg:#3a1b19;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.6;
+  padding-block:20px 72px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-head);margin:0;line-height:1.3}
+h1{font-size:24px;font-weight:900;letter-spacing:.01em}
+h2{font-size:17px;font-weight:900}
+p{margin:0}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.brand p{color:var(--muted);font-size:13px;margin-top:2px}
+.state{font-size:12px;color:var(--muted);font-family:var(--f-num);padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.card>h2{margin-bottom:12px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.wide{grid-column:span 2}
+@media (max-width:520px){.fld.wide{grid-column:auto}}
+.fld>span,.mini-fld>span.k{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+input,textarea,select{
+  font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+  padding:7px 9px;width:100%;min-width:0;
+}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+input[type=checkbox]{width:auto;accent-color:var(--accent)}
+textarea{resize:vertical;line-height:1.5;min-height:3.4em;field-sizing:content}
+.mono,input[type=number]{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.btn{
+  font:inherit;font-weight:700;font-size:13px;cursor:pointer;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:6px;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;line-height:1.3;
+}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad)}
+.btn.small{font-size:12px;padding:4px 9px}
+.btn.armed{background:var(--bad);color:var(--panel);border-color:var(--bad)}
+.hint{color:var(--muted);font-size:12.5px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.memo{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.memo summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--muted)}
+.memo-body{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.memo-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.snaps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.snaps li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2)}
+.snaps .nm{flex:1 1 180px;font-weight:700;min-width:0}
+.snaps .at{font-family:var(--f-num);font-size:12px;color:var(--muted)}
+
+.tabs{display:flex;gap:2px;border-bottom:2px solid var(--line);margin:20px 0 16px;overflow-x:auto}
+.tab{
+  font-family:var(--f-head);font-weight:900;font-size:15px;padding:10px 16px;background:none;border:0;color:var(--muted);
+  cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;
+}
+.tab:hover{color:var(--ink)}
+.tab{display:inline-flex;align-items:center;gap:8px}
+.ic.sm{width:15px;height:15px}
+.r-notes label>span,.fld>span{display:inline-flex;align-items:center;gap:5px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+.cols{display:grid;grid-template-columns:288px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+.rail{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:860px){.rail{position:static;max-height:300px}}
+.rail h2{margin-bottom:4px}
+.rail .hint{margin-bottom:10px}
+.picks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pick{
+  width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;align-items:center;text-align:left;cursor:pointer;
+  font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;
+}
+.pick:hover{border-color:var(--accent);background:var(--accent-soft)}
+.pk-t{font-weight:700;overflow-wrap:anywhere}
+.pk-m{grid-column:1;font-family:var(--f-num);font-size:11.5px;color:var(--muted)}
+.pk-plus{grid-column:2;grid-row:1/3;font-size:18px;font-weight:700;color:var(--accent)}
+.used{font-style:normal;font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:1px 6px;border-radius:999px;margin-left:6px;white-space:nowrap}
+.empty{list-style:none;color:var(--muted);padding:18px;border:1px dashed var(--line);border-radius:8px;text-align:center}
+
+.set-bar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.set-bar .l{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pill{font-family:var(--f-num);font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line)}
+.pill.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.pill.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.pill.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}
+
+.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.row,.lib-row{
+  background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:8px;
+  padding:10px 12px;display:flex;flex-direction:column;gap:8px;
+}
+.row.k-mc{border-left-color:var(--warn)}
+.row.k-se,.row.k-free{border-left-color:var(--muted)}
+.row.dragging{box-shadow:0 10px 28px rgba(0,0,0,.28);position:relative;z-index:5;border-color:var(--accent)}
+.row.flash{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:var(--accent-soft)}to{background:var(--panel)}}
+@media (prefers-reduced-motion:reduce){.row.flash{animation:none}}
+.r-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.handle{
+  width:30px;height:34px;flex:none;cursor:grab;touch-action:none;border:1px solid var(--line);background:var(--panel-2);
+  color:var(--muted);border-radius:6px;font-size:14px;letter-spacing:-2px;line-height:1;padding:0;
+}
+.handle:active{cursor:grabbing}
+.no{font-family:var(--f-num);font-weight:700;min-width:30px;text-align:center;color:var(--accent);font-size:15px}
+.row.k-mc .no{color:var(--warn)} .row.k-se .no,.row.k-free .no{color:var(--muted);font-size:12px}
+.r-title{flex:1 1 170px;font-weight:700;width:auto}
+.mini-fld{display:flex;align-items:center;gap:5px}
+.mini-fld input{width:76px;text-align:right}
+.mini-fld .u{font-size:12px;color:var(--muted)}
+.row.k-mc .mini-fld.len input{border-color:var(--warn);background:var(--warn-bg)}
+.r-actions{display:flex;gap:6px;margin-left:auto}
+.r-notes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:560px){.r-notes{grid-template-columns:1fr}}
+.r-notes label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.r-notes label>span{font-size:11.5px;font-weight:700;color:var(--muted);letter-spacing:.05em}
+.notes-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+@media (max-width:700px){.notes-grid{grid-template-columns:1fr}}
+.se-line{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.se-line input[type=text],.se-line input:not([type]){flex:1 1 260px;width:auto}
+.fixed-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:10px 12px;border:1px dashed var(--line);border-left:5px solid var(--muted);border-radius:8px;background:var(--panel-2);color:var(--muted)}
+.fixed-row strong{color:var(--ink)}
+.lib-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.lib-row .r-actions{margin-left:0}
+
+.stage-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+@media (max-width:860px){.stage-wrap{grid-template-columns:minmax(0,1fr)}}
+.stage-side{display:flex;flex-direction:column;gap:12px}
+.stagebox.edit{width:100%;height:auto;aspect-ratio:700/430;--sk:var(--ink);--sbg:var(--panel)}
+.stagebox.edit .si{cursor:grab;touch-action:none;user-select:none}
+.si.sel{outline:2px dashed var(--accent);outline-offset:5px}
+.stage-notes{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+
+.pv-bar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+fieldset.out-sel{border:1px solid var(--line);border-radius:8px;padding:6px 12px 8px;margin:0;display:flex;gap:16px;flex-wrap:wrap}
+fieldset.out-sel legend{font-size:12px;font-weight:700;color:var(--muted);padding:0 6px}
+fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
+#copyBox{margin:10px 0;min-height:140px}
+#pages{margin-top:14px;display:flex;flex-direction:column;gap:18px}
+.pwrap{position:relative;overflow:hidden;width:100%;background:var(--bg)}
+.pwrap .page{transform-origin:0 0;position:absolute;left:0;top:0;box-shadow:0 2px 14px rgba(0,0,0,.22)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-weight:700;font-size:13px;z-index:30;max-width:calc(100% - 32px)}
+</style>
+
+<!-- A4 sheet styles. Shared verbatim with the downloaded file. Paper stays white in every theme. -->
+<style id="pageCss">
+.page{width:794px;min-height:1120px;box-sizing:border-box;padding:48px 46px 44px;background:#fff;color:#000;font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;text-align:left;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page *{box-sizing:border-box}
+.p-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 10px}
+.p-band{font-size:28px;font-weight:900;letter-spacing:-.01em}
+.p-kana{font-size:14px;font-weight:700}
+.p-chip{font-size:19px;font-weight:700;padding:3px 14px;line-height:1.35}
+.p-chip.fill{background:#000;color:#fff}
+.p-chip.line{border:2px solid #000;padding:1px 12px}
+.p-time{font-size:18px;font-weight:700;margin-left:8px}
+.p-meta{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:30px 0 12px;font-size:14px;font-weight:700;min-height:20px}
+.p-meta .r{text-align:right}
+.p-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.p-tbl th,.p-tbl td{border:1.5px solid #000;padding:10px 10px;font-size:14px;font-weight:700;vertical-align:middle;overflow-wrap:anywhere;height:50px}
+.p-tbl th{font-size:13.5px;padding:7px 6px;text-align:center;line-height:1.25;height:auto}
+.p-tbl td.c{text-align:center}
+.p-tbl td.req{white-space:pre-line;line-height:1.4}
+.p-tbl.compact td{padding:6px 9px;font-size:13px;height:40px}
+.p-tbl tr.tot td{border-top:3px double #000}
+.p-notes{list-style:none;margin:26px 0 0;padding:0;font-size:17px;font-weight:700;line-height:1.5}
+.p-notes li{padding-left:1em;text-indent:-1em;margin-bottom:6px}
+.p-notes li::before{content:"・"}
+.p-text{white-space:pre-line;font-size:15.5px;font-weight:700;line-height:1.7;margin:30px 0 34px}
+.p-lineup{text-align:center;font-size:17px;font-weight:700;margin-top:14px}
+.stagebox{--u:1px;position:relative;width:700px;height:430px;border:2px solid var(--sk,#000);background:var(--sbg,#fff);color:var(--sk,#000);margin:0 auto;font-family:inherit;overflow:hidden}
+.stagebox .st-title{position:absolute;left:calc(var(--u)*22);top:calc(var(--u)*14);font-size:calc(var(--u)*20);font-weight:700}
+.si{position:absolute;transform:translate(-50%,-50%);width:max-content;text-align:center;font-weight:700;line-height:1.35;color:var(--sk,#000);white-space:pre-line}
+.si .lb{font-size:calc(var(--u)*14)}
+.si .sb{font-size:calc(var(--u)*11.5);margin-top:calc(var(--u)*5);white-space:pre-line;max-width:calc(var(--u)*240)}
+.si.box .bx{border:calc(var(--u)*2) solid var(--sk,#000);background:var(--sbg,#fff);padding:calc(var(--u)*11) calc(var(--u)*24);min-width:calc(var(--u)*120)}
+.si.box .lb{font-size:calc(var(--u)*20)}
+.si.box .sb{margin-top:calc(var(--u)*1)}
+.si svg{display:block;margin:calc(var(--u)*4) auto 0;width:calc(var(--u)*40);height:calc(var(--u)*84);overflow:visible;fill:none;stroke:currentColor;stroke-width:2}
+.si.mic{display:flex;align-items:center;gap:calc(var(--u)*6)}
+.si.mic svg{width:calc(var(--u)*34);height:calc(var(--u)*34);margin:0}
+.si.text{font-size:calc(var(--u)*12.5);max-width:calc(var(--u)*330)}
+</style>
+
+<style>[hidden]{display:none!important}body{margin:0}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>要望シートメーカー</h1>
+      <p>PA要望・照明要望・セット図を、公演ごとに組み替えてA4で出します。</p>
+    </div>
+    <p id="saveState" class="state" role="status" aria-live="polite">読み込み中…</p>
+  </header>
+
+  <section class="card" aria-labelledby="h-event">
+    <h2 id="h-event">公演情報</h2>
+    <div class="fields">
+      <label class="fld"><span>バンド名</span><input id="f-band" data-bind="event.band" autocomplete="off"></label>
+      <label class="fld"><span>読み</span><input id="f-kana" data-bind="event.kana" autocomplete="off"></label>
+      <label class="fld"><span>日付</span><input id="f-date" type="date" data-bind="event.date"></label>
+      <label class="fld wide"><span>会場名</span><input id="f-venue" data-bind="event.venue" autocomplete="off"></label>
+      <label class="fld"><span>持ち時間（分）</span><input id="f-min" type="number" min="0" step="1" data-bind="event.minutes"></label>
+    </div>
+    <details class="memo" id="memo">
+      <summary>公演の保存・呼び出し・バックアップ</summary>
+      <div class="memo-body">
+        <div class="memo-row">
+          <button class="btn" id="btnNew" type="button">新しい公演を始める</button>
+          <span class="hint">日付・会場・セットリストを空にします。曲ライブラリとセット図は残ります。</span>
+        </div>
+        <div class="memo-row">
+          <button class="btn" id="btnSnap" type="button">いまの公演を保存</button>
+          <span class="hint">日付と会場名で名前が付きます。あとから呼び出せます。</span>
+        </div>
+        <ul class="snaps" id="snapList"></ul>
+        <div class="memo-row">
+          <button class="btn" id="btnBackup" type="button">バックアップを書き出す</button>
+          <label class="btn" for="fileIn">バックアップを読み込む</label>
+          <input id="fileIn" type="file" accept=".json,application/json" hidden>
+        </div>
+        <p class="hint">データはクラウドに、使えない場合はこの端末に保存されます。端末を変える前はバックアップがあると安心です。</p>
+      </div>
+    </details>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="作業">
+    <button class="tab" role="tab" id="t-set" aria-selected="true" aria-controls="p-set" data-tab="set" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>セットリスト</button>
+    <button class="tab" role="tab" id="t-lib" aria-selected="false" aria-controls="p-lib" data-tab="lib" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>曲ライブラリ</button>
+    <button class="tab" role="tab" id="t-stage" aria-selected="false" aria-controls="p-stage" data-tab="stage" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="8.5" r="1.2"/><rect x="6" y="12.5" width="4" height="4"/><rect x="14" y="12.5" width="4" height="4"/></svg>セット図</button>
+    <button class="tab" role="tab" id="t-preview" aria-selected="false" aria-controls="p-preview" data-tab="preview" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>プレビュー・出力</button>
+  </div>
+
+  <section id="p-set" role="tabpanel" aria-labelledby="t-set">
+    <div class="cols">
+      <aside class="card rail" aria-label="曲ライブラリ">
+        <h2>曲ライブラリ</h2>
+        <p class="hint">押すとセットリストの末尾に入ります。</p>
+        <ul class="picks" id="pick"></ul>
+      </aside>
+      <div>
+        <div class="set-bar">
+          <div class="l"><h2>セットリスト</h2><span id="total" class="pill"></span></div>
+          <div class="btns">
+            <button class="btn small" type="button" data-add="se-in">＋入場SE</button>
+            <button class="btn small" type="button" data-add="mc">＋MC</button>
+            
+            <button class="btn small" type="button" data-add="free">＋その他</button>
+          </div>
+        </div>
+        <ol class="rows" id="setList"></ol>
+        <div class="fixed-row"><strong>退場SE</strong><span>固定です（編集・移動・削除はできません）。表の最後、合計の上に自動で入ります。長さは空欄です。</span></div>
+        <div class="fixed-row"><strong>合計</strong><span>全行の長さから自動計算して、表の最下行に固定表示します。</span></div>
+        <p class="hint" style="margin-top:8px">左端の ⋮⋮ をドラッグ（キーボードは↑↓）で並べ替え。MCの長さはその場で変えられます。</p>
+        <div class="se-line">
+          <label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-bind="event.seNote"> SEの注記を表に入れる</label>
+          <input type="text" data-bind="event.seText" aria-label="SEの注記" autocomplete="off">
+        </div>
+        <div class="notes-grid">
+          <label class="fld"><span><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>PAへの共通要望（1行1項目、箇条書きで出力）</span><textarea data-bind="paNotes" rows="3"></textarea></label>
+          <label class="fld"><span><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>照明への共通要望（1行1項目、箇条書きで出力）</span><textarea data-bind="lightNotes" rows="3"></textarea></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="p-lib" role="tabpanel" aria-labelledby="t-lib" hidden>
+    <div class="set-bar">
+      <div class="l"><h2>曲ライブラリ</h2><span class="hint">曲名・BPM・長さ・PA/照明の要望を一度登録しておくと、毎回呼び出せます。</span></div>
+      <button class="btn primary" id="btnAddLib" type="button">＋曲を登録</button>
+    </div>
+    <ul class="lib-list" id="libList"></ul>
+  </section>
+
+  <section id="p-stage" role="tabpanel" aria-labelledby="t-stage" hidden>
+    <div class="stage-notes">
+      <label class="fld"><span>セット図ページの前書き</span><textarea data-bind="stage.notes" rows="4"></textarea></label>
+      <label class="fld"><span>編成（図の下に出ます）</span><input data-bind="stage.lineup" autocomplete="off"></label>
+    </div>
+    <div class="stage-wrap">
+      <div id="stageEdit"></div>
+      <div class="stage-side">
+        <div class="card">
+          <h2 style="margin-bottom:10px">部品を追加</h2>
+          <div class="btns">
+            <button class="btn small" type="button" data-sadd="box">＋ボックス</button>
+            <button class="btn small" type="button" data-sadd="vocal">＋ボーカルマイク</button>
+            <button class="btn small" type="button" data-sadd="mic">＋コーラスマイク</button>
+            <button class="btn small" type="button" data-sadd="text">＋テキスト</button>
+          </div>
+        </div>
+        <div class="card" id="stageInsp"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="p-preview" role="tabpanel" aria-labelledby="t-preview" hidden>
+    <div class="pv-bar">
+      <fieldset class="out-sel">
+        <legend>出力するページ</legend>
+        <label><input type="checkbox" data-bind="out.pa"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>PA要望</label>
+        <label><input type="checkbox" data-bind="out.light"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>照明要望</label>
+        <label><input type="checkbox" data-bind="out.stage"> セット図</label>
+      </fieldset>
+      <div class="btns">
+        <button class="btn primary" id="btnSaveHtml" type="button">A4シートを保存（HTML）</button>
+        <button class="btn" id="btnCopyPa" type="button"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>PA要望をテキストでコピー</button>
+        <button class="btn" id="btnCopyLight" type="button"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>照明要望をテキストでコピー</button>
+      </div>
+    </div>
+    <p class="hint">この画面からは印刷できないので、保存したHTMLを開いて「印刷 → PDFに保存」（A4・余白なし）でPDFにします。メールやLINEにはテキストコピーが便利です。</p>
+    <textarea id="copyBox" readonly hidden aria-label="コピー用テキスト"></textarea>
+    <div id="pages"></div>
+  </section>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function(){
+'use strict';
+const KEY='yobo-sheet.v1';
+const I_PA='<svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+const I_LT='<svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>';
+const EXIT_PA='最後の曲が終わったら流してください\nほどよく切ってください';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>{n=Number(n);return isFinite(n)?String(Math.round(n*100)/100):''};
+const numOrEmpty=v=>{const n=parseFloat(v);return isFinite(n)?n:''};
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const fmtDate=d=>d?String(d).replace(/-/g,'/'):'';
+const clone=o=>JSON.parse(JSON.stringify(o));
+function getPath(o,p){return p.split('.').reduce((a,k)=>a==null?a:a[k],o)}
+function setPath(o,p,v){const ks=p.split('.');const last=ks.pop();const t=ks.reduce((a,k)=>a[k],o);t[last]=v}
+
+/* ---------- 初期データ（leroyの実データ） ---------- */
+function seed(){
+  const lib=[
+    {id:'l1',title:'ブッダは神である。',bpm:144,len:3.5,pa:'Cメロでドラムコーラスが入ります。',light:'カラフルに。ミラーボール、逆光強め'},
+    {id:'l2',title:'あいどるちゃん',bpm:125,len:4,pa:'Ba/Voメイン、Gtがコーラス入ります',light:'カラフルに激しく'},
+    {id:'l3',title:'サンフランシスコでディスコ',bpm:183,len:4,pa:'Ba/Vo、Gt/Voツインボーカル',light:'暖色系+緑、カラフルに激しく'},
+    {id:'l4',title:'だんだんいい感じー。',bpm:135,len:4,pa:'Ba/Voメイン\n後半ドラムコーラス入ります',light:'赤/青\nミラーボール、ディスコな感じ。スモーク欲しいです。'},
+    {id:'l5',title:'M・F・U',bpm:123,len:4,pa:'ベースボーカルメイン',light:'紫/ピンク、緑などサイケデリック\nスモークあれば'},
+    {id:'l6',title:'大人にならずにちょっとでいよう。',bpm:140,len:3.5,pa:'Gt/Vo、Baのツインボーカル、サビDr Choあり',light:'明るく楽しい雰囲気で'},
+    {id:'l7',title:'チャオ！',bpm:130,len:4.5,pa:'Ba/Voメイン、GtとDrがサビでコーラス入ります',light:'暖色系+緑、カラフルに激しく'},
+    {id:'l8',title:'DON’T STOP GABA MUSIC',bpm:133,len:5.5,pa:'Gt/Vo、Baのツインボーカル、後半Dr Cho入ります',light:'曲の最初（イントロ）は逆光強め。オレンジ、黄色、白\nミラーボール、ディスコな感じ。スモーク欲しいです。'}
+  ];
+  const song=(l,i)=>({id:'i'+i,k:'song',songId:l.id,title:l.title,bpm:l.bpm,len:l.len,pa:l.pa,light:l.light});
+  const L=lib;
+  const set=[
+    {id:'i0',k:'se',title:'入場SE',bpm:'',len:1,pa:'ドラムが始まったらSEを切ってください',light:''},
+    song(L[0],1),song(L[1],2),song(L[2],3),
+    {id:'i4',k:'mc',title:'MC',bpm:'',len:1,pa:'',light:''},
+    song(L[3],5),song(L[4],6),song(L[5],7),
+    {id:'i8',k:'mc',title:'MC',bpm:'',len:2.5,pa:'',light:''},
+    song(L[6],9),song(L[7],10),
+    {id:'i11',k:'se',title:'退場SE',bpm:'',len:1,pa:'最後の曲が終わったら流してください\nほどよく切ってください',light:''}
+  ];
+  return {
+    v:1,savedAt:0,
+    event:{band:'leroy',kana:'リロイ',venue:'下北沢近道',date:'2026-10-26',minutes:40,seNote:true,seText:'入場SE/退場SEあり（CDをお渡しします）'},
+    lib,set,
+    paNotes:'上手のギターボーカルの声に全曲通してショートディレイをかけてください。\nドラムが始まったらSEを切ってください。',
+    lightNotes:'',
+    stage:{
+      notes:'※基本ツインボーカルです、時々ドラムがコーラスで入ります。\nフロント前2人のモニターにドラム3点とそれぞれ自分の声の返しをください。\n\n※ボーカルが主体のロックバンドになります。中音は自分達が聞きやすいように作るので、外音でベースやギターの音量が物足りない場合、PAさんの方でしっかり出して頂いて構いません。',
+      lineup:'編成：（上手）Vo/Gt,（下手）Ba/Vo, Dr/Cho',
+      items:[
+        {id:'s1',kind:'box',label:'Dr.',sub:'（1タム）',x:50,y:15},
+        {id:'s2',kind:'mic',label:'Cho.',sub:'',x:68,y:9},
+        {id:'s3',kind:'text',label:'(持込:スネア、キックペダル、ライド、\nハイハット、スプラッシュ、クラッシュ)\nレンタル：シンバルスタンド1本',sub:'',x:50,y:33},
+        {id:'s4',kind:'box',label:'Ba Amp.',sub:'',x:20,y:47},
+        {id:'s5',kind:'box',label:'JC',sub:'',x:80,y:47},
+        {id:'s6',kind:'text',label:'※上下両方マイクケーブルを\nマイクスタンドに巻かないでください\n（ハンドマイクに切り替えるときがあるため）',sub:'',x:50,y:55},
+        {id:'s7',kind:'vocal',label:'Vo./Ba',sub:'(持込:マイクホルダー/\nTELEFUNKEN M80)',x:20,y:77},
+        {id:'s8',kind:'vocal',label:'Vo./Gt',sub:'(持込:SHURE SM58)',x:80,y:77},
+        {id:'s9',kind:'box',label:'お立ち台',sub:'(お借りしたいです)',x:50,y:81}
+      ]
+    },
+    out:{pa:true,light:true,stage:true},
+    saved:[]
+  };
+}
+function normalize(s){
+  const d=seed();
+  const o=Object.assign({},d,s||{});
+  o.event=Object.assign({},d.event,(s&&s.event)||{});
+  o.stage=Object.assign({},d.stage,(s&&s.stage)||{});
+  o.out=Object.assign({pa:true,light:true,stage:true},(s&&s.out)||{});
+  ['lib','set','saved'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=[]});
+  if(!Array.isArray(o.stage.items))o.stage.items=d.stage.items;
+  const isExit=i=>i&&i.k==='se'&&i.title==='退場SE';
+  o.set=o.set.filter(i=>!isExit(i));
+  o.saved.forEach(sv=>{if(sv.data&&Array.isArray(sv.data.set))sv.data.set=sv.data.set.filter(i=>!isExit(i))});
+  return o;
+}
+function loadLocal(){
+  try{const t=localStorage.getItem(KEY);if(t)return normalize(JSON.parse(t))}catch(e){}
+  return null;
+}
+
+/* ---------- ライブラリ一括取り込み（一度だけ） ---------- */
+const EXTRA_LIB=[
+  {title:'leroyのテーマ',bpm:134,len:4,pa:'全体を通して３人が歌います。',light:'緑、黄色など。ミラーボール、逆光強め'},
+  {title:'コーク、ニューヨーク、リバティーアイランド',bpm:192,len:2.5,pa:'Ba/Voメイン\nサビでGtもコーラス、Cメロはドラムコーラスが入ります。',light:'赤/青 パンキッシュな感じ。\nCメロは一度落としてラスサビで明るく'},
+  {title:'カレーライス',bpm:123,len:3,pa:'ギターボーカルメイン\nサビでベース、ドラムコーラス入ります',light:'オレンジメイン、夕日・ドラマチックなイメージ'},
+  {title:'I’m happy',bpm:100,len:4,pa:'ギターボーカルメイン\nサビでドラムコーラス入ります',light:'赤メイン、ギターソロでストロボ'},
+  {title:'AM5',bpm:134,len:3.5,pa:'Gt/VoメインCメロでBa、Drコーラス入ります\nドラム３点やや大きめ',light:'ストロボ・ストロボ・ストロボ'},
+  {title:'右手は添えるだけ',bpm:130,len:4.5,pa:'Gt/Voメイン、Baコーラス入ります',light:'赤・青で怪しいイメージ　サビは明るく'},
+  {title:'宇宙花火',bpm:130,len:3.5,pa:'Ba/Voメイン、サビはGtコーラス、ラスサビDrコーラスも。',light:'紫色でキラキラ宇宙っぽい感じ、ミラーボール'},
+  {title:'紫',bpm:130,len:4,pa:'Gt/Voメイン、Baコーラス入ります。',light:'最初は青基調で静かな感じ、だんだん明るく逆光強めで'},
+  {title:'美しくあれ',bpm:138,len:3,pa:'Gt/Vo、Ba/Voのツインボーカルです',light:'明るく楽しい雰囲気で'},
+  {title:'Boy Meets Love',bpm:134,len:4,pa:'Gt/Voメイン、Baコーラス入ります。',light:'赤・青/紫・緑などサイケデリックなイメージで'},
+  {title:'まとめてPIZZAに！',bpm:139,len:4,pa:'Ba/Vo、Gt/Voツインボーカル',light:'暖色系+緑、カラフルに激しく'},
+  {title:'まわるまわるJKローリング',bpm:178,len:2.5,pa:'Ba/Vo、Gt/Voツインボーカル、ラスサビDr Choあり',light:'黄色、オレンジなど暖色系で激しく'}
+];
+function applyImport(s){
+  if(!Array.isArray(s.imported))s.imported=[];
+  if(s.imported.indexOf('lib2')>=0)return false;
+  EXTRA_LIB.forEach(t=>{
+    if(!s.lib.some(x=>x.title===t.title))s.lib.push(Object.assign({id:'x'+uid()},t));
+  });
+  s.imported.push('lib2');
+  return true;
+}
+
+/* ---------- 保存 ---------- */
+let state=loadLocal()||normalize(seed());
+if(applyImport(state)){state.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+let dbDoc=null,dbBusy=false,dbDirty=false,saveTimer=0,mode='local';
+function setStatus(kind){
+  const t={saving:'保存中…',cloud:'クラウドに保存済み',local:'この端末に保存済み',view:'閲覧のみ・この端末に保存'}[kind]||'';
+  $('#saveState').textContent=t;
+}
+function touch(){
+  state.savedAt=Date.now();
+  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+  setStatus('saving');
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(flush,700);
+}
+async function flush(){
+  if(!dbDoc){setStatus(mode==='view'?'view':'local');return}
+  if(dbBusy){dbDirty=true;return}
+  dbBusy=true;
+  try{
+    await dbDoc.set({json:JSON.stringify(state),savedAt:state.savedAt});
+    mode='cloud';setStatus('cloud');
+  }catch(e){
+    dbDoc=null;mode='view';setStatus('view');
+  }
+  dbBusy=false;
+  if(dbDirty){dbDirty=false;flush()}
+}
+async function connectDb(){
+  try{
+    const db=await window.claude.use('db');
+    if(!db){setStatus('local');return}
+    const ref=db.doc('app/state');
+    const snap=await ref.get();
+    dbDoc=ref;
+    if(snap.exists){
+      const d=snap.data()||{};
+      if((d.savedAt||0)>(state.savedAt||0)){
+        try{state=normalize(JSON.parse(d.json));const ch=applyImport(state);if(ch)state.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){};renderAll();if(ch)flush();else setStatus('cloud');return}catch(e){}
+      }
+    }
+    if(state.savedAt){flush()}else{mode='cloud';setStatus('cloud')}
+  }catch(e){
+    dbDoc=null;setStatus('local');
+  }
+}
+
+/* ---------- 共通UI ---------- */
+let toastT=0;
+function toast(msg){
+  const t=$('#toast');t.textContent=msg;t.hidden=false;
+  clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3200);
+}
+function arm(btn,label,fn){
+  if(btn.dataset.armed){clearTimeout(btn._t);delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._old;fn();return}
+  btn.dataset.armed='1';btn._old=btn.textContent;btn.textContent=label;btn.classList.add('armed');
+  btn._t=setTimeout(()=>{delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._old},3000);
+}
+let pvTimer=0;
+function schedulePreview(){
+  if($('#p-preview').hidden)return;
+  clearTimeout(pvTimer);pvTimer=setTimeout(renderPreview,250);
+}
+
+/* ---------- 合計 ---------- */
+function updateTotal(){
+  const t=state.set.reduce((a,i)=>a+(parseFloat(i.len)||0),0);
+  const m=parseFloat(state.event.minutes)||0;
+  const el=$('#total');
+  const diff=m-t;
+  let cls='',txt='合計 '+fmt(t)+'分';
+  if(m){
+    if(Math.abs(diff)<0.005){cls='ok';txt+=' / 持ち時間ぴったり'}
+    else if(diff>0){cls=diff>10?'warn':'ok';txt+=' / 持ち時間まであと'+fmt(diff)+'分'}
+    else{cls='bad';txt+=' / 持ち時間を'+fmt(-diff)+'分オーバー'}
+  }
+  el.className='pill '+cls;el.textContent=txt;
+}
+
+/* ---------- 汎用バインド ---------- */
+function bindFields(){
+  $$('[data-bind]').forEach(el=>{
+    const v=getPath(state,el.dataset.bind);
+    if(el.type==='checkbox')el.checked=!!v;else el.value=v==null?'':v;
+  });
+}
+function onBound(e){
+  const el=e.target.closest('[data-bind]');if(!el)return;
+  const p=el.dataset.bind;
+  let v;
+  if(el.type==='checkbox')v=el.checked;
+  else if(el.type==='number')v=numOrEmpty(el.value);
+  else v=el.value;
+  setPath(state,p,v);
+  touch();
+  if(p==='event.minutes')updateTotal();
+  if(p==='event.band')renderStageCanvas();
+  schedulePreview();
+}
+document.addEventListener('input',onBound);
+document.addEventListener('change',onBound);
+
+/* ---------- セットリスト ---------- */
+const TAGS={se:'SE',mc:'MC',free:'他'};
+function rowHTML(it){
+  const song=it.k==='song';
+  return `<li class="row k-${it.k}" data-id="${it.id}" data-k="${it.k}">
+  <div class="r-top">
+    <button class="handle" type="button" aria-label="並べ替え（ドラッグ、または上下キー）" title="ドラッグで並べ替え">⋮⋮</button>
+    <span class="no">${song?'':TAGS[it.k]||''}</span>
+    <input class="r-title" data-f="title" value="${esc(it.title)}" aria-label="曲名・項目名" autocomplete="off">
+    ${song?`<label class="mini-fld"><span class="k">BPM</span><input type="number" min="0" step="1" data-f="bpm" value="${esc(it.bpm)}" aria-label="BPM"></label>`:''}
+    <label class="mini-fld len"><span class="k">長さ</span><input type="number" min="0" step="0.5" data-f="len" value="${esc(it.len)}" aria-label="長さ（分）"><span class="u">分</span></label>
+    <span class="r-actions">
+      ${song&&it.songId&&state.lib.some(s=>s.id===it.songId)?'<button class="btn small" type="button" data-act="tolib" title="この行の内容を曲ライブラリに上書き">ライブラリへ反映</button>':''}
+      <button class="btn small danger" type="button" data-act="del">削除</button>
+    </span>
+  </div>
+  <div class="r-notes">
+    <label><span>${I_PA}PA</span><textarea data-f="pa" rows="2" aria-label="PAへの要望">${esc(it.pa)}</textarea></label>
+    <label><span>${I_LT}照明</span><textarea data-f="light" rows="2" aria-label="照明への要望">${esc(it.light)}</textarea></label>
+  </div>
+</li>`;
+}
+function renderSet(){
+  const ul=$('#setList');
+  ul.innerHTML=state.set.length?state.set.map(rowHTML).join(''):'<li class="empty">まだ空です。左のライブラリから曲を入れてください。</li>';
+  renumber();
+}
+function renumber(){
+  let n=0;
+  $$('#setList .row').forEach(li=>{
+    if(li.dataset.k==='song'){n++;li.querySelector('.no').textContent=n}
+  });
+}
+function renderPick(){
+  const used=new Map();
+  state.set.forEach(i=>{if(i.songId)used.set(i.songId,(used.get(i.songId)||0)+1)});
+  $('#pick').innerHTML=state.lib.length?state.lib.map(s=>`<li><button class="pick" type="button" data-add-song="${s.id}">
+    <span class="pk-t">${esc(s.title)}${used.has(s.id)?'<em class="used">使用中</em>':''}</span>
+    <span class="pk-m">${s.bpm?esc(s.bpm)+' BPM':''}${s.bpm&&s.len?' · ':''}${s.len?esc(fmt(s.len))+'分':''}</span>
+    <span class="pk-plus" aria-hidden="true">＋</span></button></li>`).join(''):'<li class="empty">「曲ライブラリ」タブで曲を登録してください。</li>';
+}
+function flashRow(id){
+  const li=$(`#setList [data-id="${id}"]`);
+  if(!li)return;
+  li.classList.add('flash');
+  li.scrollIntoView({block:'nearest',behavior:'smooth'});
+  setTimeout(()=>li.classList.remove('flash'),1300);
+}
+function addSong(songId){
+  const s=state.lib.find(x=>x.id===songId);if(!s)return;
+  const it={id:uid(),k:'song',songId:s.id,title:s.title,bpm:s.bpm,len:s.len,pa:s.pa,light:s.light};
+  state.set.push(it);
+  renderSet();renderPick();updateTotal();touch();schedulePreview();flashRow(it.id);
+}
+function addSpecial(type){
+  const base={id:uid(),bpm:'',pa:'',light:''};
+  let it;
+  if(type==='mc'){it=Object.assign(base,{k:'mc',title:'MC',len:1});state.set.push(it)}
+  else if(type==='se-in'){it=Object.assign(base,{k:'se',title:'入場SE',len:1});state.set.unshift(it)}
+  else if(type==='se-out'){it=Object.assign(base,{k:'se',title:'退場SE',len:1});state.set.push(it)}
+  else{it=Object.assign(base,{k:'free',title:'転換',len:1});state.set.push(it)}
+  renderSet();updateTotal();touch();schedulePreview();flashRow(it.id);
+}
+$('#pick').addEventListener('click',e=>{
+  const b=e.target.closest('[data-add-song]');if(b)addSong(b.dataset.addSong);
+});
+$$('[data-add]').forEach(b=>b.addEventListener('click',()=>addSpecial(b.dataset.add)));
+
+const setList=$('#setList');
+setList.addEventListener('input',e=>{
+  const f=e.target.dataset.f;if(!f)return;
+  const li=e.target.closest('.row');if(!li)return;
+  const it=state.set.find(x=>x.id===li.dataset.id);if(!it)return;
+  it[f]=(f==='bpm'||f==='len')?numOrEmpty(e.target.value):e.target.value;
+  touch();
+  if(f==='len')updateTotal();
+  if(f==='title')renderPick();
+  schedulePreview();
+});
+setList.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const li=b.closest('.row');const it=state.set.find(x=>x.id===li.dataset.id);if(!it)return;
+  if(b.dataset.act==='del'){
+    arm(b,'本当に削除？',()=>{
+      state.set=state.set.filter(x=>x.id!==it.id);
+      renderSet();renderPick();updateTotal();touch();schedulePreview();
+    });
+  }else if(b.dataset.act==='tolib'){
+    const s=state.lib.find(x=>x.id===it.songId);
+    if(s){Object.assign(s,{title:it.title,bpm:it.bpm,len:it.len,pa:it.pa,light:it.light});renderLib();renderPick();touch();toast('ライブラリを更新しました')}
+  }
+});
+setList.addEventListener('pointerdown',e=>{
+  const h=e.target.closest('.handle');if(!h)return;
+  const li=h.closest('.row');
+  e.preventDefault();
+  try{h.setPointerCapture(e.pointerId)}catch(err){}
+  li.classList.add('dragging');
+  const mv=ev=>{
+    const y=ev.clientY;
+    const sibs=Array.from(setList.children).filter(x=>x!==li);
+    let before=null;
+    for(const s of sibs){const r=s.getBoundingClientRect();if(y<r.top+r.height/2){before=s;break}}
+    if(li.nextElementSibling!==before){setList.insertBefore(li,before);renumber()}
+    if(y<70)window.scrollBy(0,-14);else if(y>window.innerHeight-70)window.scrollBy(0,14);
+  };
+  const up=()=>{
+    h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',up);h.removeEventListener('pointercancel',up);
+    li.classList.remove('dragging');
+    const ids=Array.from(setList.querySelectorAll('.row')).map(x=>x.dataset.id);
+    state.set=ids.map(id=>state.set.find(x=>x.id===id)).filter(Boolean);
+    touch();schedulePreview();
+  };
+  h.addEventListener('pointermove',mv);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);
+});
+setList.addEventListener('keydown',e=>{
+  const h=e.target.closest('.handle');if(!h)return;
+  if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+  e.preventDefault();
+  const id=h.closest('.row').dataset.id;
+  const i=state.set.findIndex(x=>x.id===id);
+  const j=e.key==='ArrowUp'?i-1:i+1;
+  if(j<0||j>=state.set.length)return;
+  const tmp=state.set[i];state.set[i]=state.set[j];state.set[j]=tmp;
+  renderSet();touch();schedulePreview();
+  const nh=$(`#setList [data-id="${id}"] .handle`);if(nh)nh.focus();
+});
+
+/* ---------- 曲ライブラリ ---------- */
+function libHTML(s){
+  return `<li class="lib-row" data-id="${s.id}">
+  <div class="r-top">
+    <input class="r-title" data-f="title" value="${esc(s.title)}" aria-label="曲名" autocomplete="off">
+    <label class="mini-fld"><span class="k">BPM</span><input type="number" min="0" step="1" data-f="bpm" value="${esc(s.bpm)}" aria-label="BPM"></label>
+    <label class="mini-fld"><span class="k">長さ</span><input type="number" min="0" step="0.5" data-f="len" value="${esc(s.len)}" aria-label="長さ（分）"><span class="u">分</span></label>
+  </div>
+  <div class="r-notes">
+    <label><span>${I_PA}PAへの要望</span><textarea data-f="pa" rows="2">${esc(s.pa)}</textarea></label>
+    <label><span>${I_LT}照明への要望</span><textarea data-f="light" rows="2">${esc(s.light)}</textarea></label>
+  </div>
+  <div class="r-actions">
+    <button class="btn small primary" type="button" data-act="add">セットリストに追加</button>
+    <button class="btn small danger" type="button" data-act="del">削除</button>
+  </div>
+</li>`;
+}
+function renderLib(){
+  $('#libList').innerHTML=state.lib.length?state.lib.map(libHTML).join(''):'<li class="empty">まだ曲がありません。「＋曲を登録」から追加してください。</li>';
+}
+$('#btnAddLib').addEventListener('click',()=>{
+  const s={id:uid(),title:'新しい曲',bpm:120,len:4,pa:'',light:''};
+  state.lib.push(s);renderLib();renderPick();touch();
+  const li=$(`#libList [data-id="${s.id}"] .r-title`);if(li){li.focus();li.select()}
+});
+const libList=$('#libList');
+libList.addEventListener('input',e=>{
+  const f=e.target.dataset.f;if(!f)return;
+  const li=e.target.closest('.lib-row');const s=state.lib.find(x=>x.id===li.dataset.id);if(!s)return;
+  s[f]=(f==='bpm'||f==='len')?numOrEmpty(e.target.value):e.target.value;
+  touch();renderPick();
+});
+libList.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const li=b.closest('.lib-row');const s=state.lib.find(x=>x.id===li.dataset.id);if(!s)return;
+  if(b.dataset.act==='add'){addSong(s.id);toast('セットリストに追加しました')}
+  else if(b.dataset.act==='del'){
+    arm(b,'本当に削除？',()=>{
+      state.lib=state.lib.filter(x=>x.id!==s.id);
+      renderLib();renderPick();touch();
+    });
+  }
+});
+
+/* ---------- セット図 ---------- */
+let selId=null;
+function itemHTML(it,edit){
+  const sel=edit&&it.id===selId?' sel':'';
+  const lb=esc(it.label),sb=it.sub?`<div class="sb">${esc(it.sub)}</div>`:'';
+  const a=`class="si ${it.kind}${sel}" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%"`;
+  if(it.kind==='box')return `<div ${a}><div class="bx"><div class="lb">${lb}</div>${sb}</div></div>`;
+  if(it.kind==='vocal')return `<div ${a}><div class="lb">${lb}</div><svg viewBox="0 0 40 84" aria-hidden="true"><path d="M20 84V6M9 18L20 5L31 18"/><circle cx="20" cy="62" r="12"/></svg>${sb}</div>`;
+  if(it.kind==='mic')return `<div ${a}><svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="12"/><path d="M5 29L29 5"/></svg><div class="lb">${lb}</div></div>`;
+  return `<div ${a}>${lb}</div>`;
+}
+function stageBoxHTML(edit){
+  return `<div class="stagebox${edit?' edit':''}"><div class="st-title">${esc(state.event.band)} セット図</div>${state.stage.items.map(i=>itemHTML(i,edit)).join('')}</div>`;
+}
+function fitStage(){
+  const box=$('#stageEdit .stagebox');if(!box)return;
+  const w=box.clientWidth;if(w)box.style.setProperty('--u',(w/700)+'px');
+}
+function renderStageCanvas(){
+  $('#stageEdit').innerHTML=stageBoxHTML(true);fitStage();
+}
+function renderInsp(){
+  const it=state.stage.items.find(i=>i.id===selId);
+  const box=$('#stageInsp');
+  if(!it){box.innerHTML='<p class="hint">図の中の部品をクリックして選ぶと、ここで文字を直せます。ドラッグで位置を動かせます。</p>';return}
+  const kinds=[['box','ボックス（アンプ・ドラムなど）'],['vocal','ボーカルマイク（矢印つき）'],['mic','コーラスマイク'],['text','テキスト']];
+  box.innerHTML=`<div style="display:flex;flex-direction:column;gap:10px">
+  <label class="fld"><span>種類</span><select data-sf="kind">${kinds.map(([v,n])=>`<option value="${v}"${it.kind===v?' selected':''}>${n}</option>`).join('')}</select></label>
+  <label class="fld"><span>${it.kind==='text'?'テキスト':'名前'}</span><textarea data-sf="label" rows="2">${esc(it.label)}</textarea></label>
+  ${it.kind==='box'||it.kind==='vocal'?`<label class="fld"><span>補足（持込機材など）</span><textarea data-sf="sub" rows="3">${esc(it.sub||'')}</textarea></label>`:''}
+  <button class="btn danger" type="button" data-sact="del">この部品を削除</button></div>`;
+}
+function renderStage(){renderStageCanvas();renderInsp()}
+function selectStage(id){
+  selId=id;
+  $$('#stageEdit .si').forEach(el=>el.classList.toggle('sel',el.dataset.id===id));
+  renderInsp();
+}
+$('#stageEdit').addEventListener('pointerdown',e=>{
+  const el=e.target.closest('.si');
+  const box=$('#stageEdit .stagebox');
+  if(!el||!box){if(selId){selectStage(null)}return}
+  e.preventDefault();
+  const it=state.stage.items.find(i=>i.id===el.dataset.id);if(!it)return;
+  if(selId!==it.id)selectStage(it.id);
+  const rect=box.getBoundingClientRect();
+  const sx=e.clientX,sy=e.clientY,ox=it.x,oy=it.y;
+  let moved=false;
+  try{el.setPointerCapture(e.pointerId)}catch(err){}
+  const mv=ev=>{
+    if(Math.abs(ev.clientX-sx)+Math.abs(ev.clientY-sy)>3)moved=true;
+    if(!moved)return;
+    it.x=Math.round(clamp(ox+(ev.clientX-sx)/rect.width*100,2,98)*10)/10;
+    it.y=Math.round(clamp(oy+(ev.clientY-sy)/rect.height*100,2,98)*10)/10;
+    el.style.left=it.x+'%';el.style.top=it.y+'%';
+  };
+  const up=()=>{
+    el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);
+    if(moved){touch();schedulePreview()}
+  };
+  el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+});
+$('#stageInsp').addEventListener('input',e=>{
+  const f=e.target.dataset.sf;if(!f||f==='kind')return;
+  const it=state.stage.items.find(i=>i.id===selId);if(!it)return;
+  it[f]=e.target.value;touch();renderStageCanvas();schedulePreview();
+});
+$('#stageInsp').addEventListener('change',e=>{
+  if(e.target.dataset.sf!=='kind')return;
+  const it=state.stage.items.find(i=>i.id===selId);if(!it)return;
+  it.kind=e.target.value;touch();renderStageCanvas();renderInsp();schedulePreview();
+});
+$('#stageInsp').addEventListener('click',e=>{
+  const b=e.target.closest('[data-sact]');if(!b)return;
+  arm(b,'本当に削除？',()=>{
+    state.stage.items=state.stage.items.filter(i=>i.id!==selId);selId=null;
+    touch();renderStage();schedulePreview();
+  });
+});
+$$('[data-sadd]').forEach(b=>b.addEventListener('click',()=>{
+  const k=b.dataset.sadd;
+  const def={box:['Gt Amp.',''],vocal:['Vo.',''],mic:['Mic',''],text:['メモ','']}[k];
+  const it={id:uid(),kind:k,label:def[0],sub:def[1],x:50,y:50};
+  state.stage.items.push(it);selId=it.id;
+  touch();renderStage();schedulePreview();
+}));
+
+/* ---------- 紙面の組み立て ---------- */
+function metaHTML(kind){
+  const e=state.event;
+  const left=[fmtDate(e.date),e.venue].filter(Boolean).join('　');
+  const right=(kind!=='stage'&&e.seNote&&e.seText)?'※'+e.seText:'';
+  return `<div class="p-meta"><span>${esc(left)}</span><span class="r">${esc(right)}</span></div>`;
+}
+function headHTML(kind){
+  const e=state.event;
+  const chip={pa:['PA要望','fill'],light:['照明要望','line'],stage:['セット図','fill']}[kind];
+  return `<div class="p-head"><span class="p-band">${esc(e.band)}</span>${e.kana?`<span class="p-kana">（${esc(e.kana)}）</span>`:''}<span class="p-chip ${chip[1]}">${chip[0]}</span>${kind!=='stage'&&e.minutes!==''?`<span class="p-time">持ち時間：${esc(fmt(e.minutes))}分</span>`:''}</div>`;
+}
+function tableHTML(kind){
+  let n=0;
+  const rows=state.set.map(it=>{
+    const song=it.k==='song';if(song)n++;
+    const req=(kind==='pa'?it.pa:it.light)||'';
+    return `<tr><td class="c">${song?n:''}</td><td class="${song?'':'c'}">${esc(it.title)}</td><td class="c">${song&&it.bpm!==''?esc(it.bpm):''}</td><td class="c">${it.len?esc(fmt(it.len)):''}</td><td class="req">${esc(req)}</td></tr>`;
+  }).join('');
+  return `<table class="p-tbl${state.set.length>13?' compact':''}"><colgroup><col style="width:50px"><col style="width:232px"><col style="width:58px"><col style="width:60px"><col></colgroup><thead><tr><th>曲順</th><th>曲名</th><th>BPM</th><th>曲の<br>長さ</th><th>要望</th></tr></thead><tbody>${rows}<tr><td class="c"></td><td class="c">退場SE</td><td class="c"></td><td class="c"></td><td class="req">${kind==='pa'?esc(EXIT_PA):''}</td></tr><tr class="tot"><td class="c"></td><td class="c">合計</td><td class="c"></td><td class="c">${fmt(state.set.reduce((a,i)=>a+(parseFloat(i.len)||0),0))}</td><td class="req"></td></tr></tbody></table>`;
+}
+function notesHTML(text){
+  const lines=String(text||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  return lines.length?`<ul class="p-notes">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:'';
+}
+function buildPage(kind){
+  if(kind==='stage'){
+    return `<section class="page">${headHTML('stage')}${metaHTML('stage')}<div class="p-text">${esc(state.stage.notes)}</div>${stageBoxHTML(false)}<div class="p-lineup">${esc(state.stage.lineup)}</div></section>`;
+  }
+  return `<section class="page">${headHTML(kind)}${metaHTML(kind)}${tableHTML(kind)}${notesHTML(kind==='pa'?state.paNotes:state.lightNotes)}</section>`;
+}
+function selectedPages(){
+  const o=state.out;
+  return ['pa','light','stage'].filter(k=>o[k]);
+}
+function renderPreview(){
+  if($('#p-preview').hidden)return;
+  const ks=selectedPages();
+  $('#pages').innerHTML=ks.length?ks.map(k=>`<div class="pwrap">${buildPage(k)}</div>`).join(''):'<p class="empty">出力するページを選んでください。</p>';
+  fitPages();
+}
+function fitPages(){
+  $$('#pages .pwrap').forEach(w=>{
+    const p=w.firstElementChild;if(!p)return;
+    const s=Math.min(1,w.clientWidth/794);
+    p.style.transform=`scale(${s})`;
+    w.style.height=Math.ceil(p.offsetHeight*s)+'px';
+    const box=p.querySelector('.stagebox');if(box)box.style.setProperty('--u','1px');
+  });
+}
+
+/* ---------- 出力 ---------- */
+function fileBase(){
+  const e=state.event;
+  const d=(e.date||'').replace(/-/g,'').slice(2);
+  return [d,e.venue,'音響照明要望',e.band].filter(Boolean).join('_').replace(/[\\\/:*?"<>|]/g,'');
+}
+function buildExport(){
+  const pages=selectedPages().map(buildPage).join('\n');
+  const css=$('#pageCss').textContent;
+  const title=fileBase()||'要望シート';
+  return `<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:0}
+html{background:#dfe3e8}
+body{margin:0;padding:0 0 40px}
+.noprint{max-width:794px;margin:0 auto;padding:14px 16px;font:14px/1.6 "Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;color:#14171c;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.noprint button{font:inherit;font-weight:700;padding:8px 16px;border:0;border-radius:6px;background:#2c47f0;color:#fff;cursor:pointer}
+.page{margin:0 auto 18px;box-shadow:0 2px 14px rgba(0,0,0,.18);break-after:page;page-break-after:always}
+@media print{html{background:#fff}body{padding:0}.noprint{display:none}.page{margin:0;box-shadow:none}.page:last-child{break-after:auto;page-break-after:auto}}
+${css}
+</style></head><body>
+<div class="noprint"><button onclick="window.print()">印刷 / PDFに保存</button><span>用紙はA4、余白「なし」、「背景のグラフィック」はオンにしてください。</span></div>
+${pages}
+</body></html>`;
+}
+function textFor(kind){
+  const e=state.event;
+  const out=[];
+  out.push(`${e.band}${e.kana?`（${e.kana}）`:''}　${kind==='pa'?'PA要望':'照明要望'}${e.minutes!==''?`　持ち時間：${fmt(e.minutes)}分`:''}`);
+  const meta=[fmtDate(e.date),e.venue].filter(Boolean).join('　');
+  if(meta)out.push(meta);
+  if(e.seNote&&e.seText)out.push('※'+e.seText);
+  out.push('');
+  let n=0;
+  state.set.forEach(it=>{
+    const song=it.k==='song';if(song)n++;
+    out.push(`${song?n+'. ':''}${it.title}${song&&it.bpm!==''?`（BPM ${it.bpm}）`:''}${it.len?`　${fmt(it.len)}分`:''}`);
+    const req=(kind==='pa'?it.pa:it.light)||'';
+    req.split('\n').filter(l=>l.trim()).forEach(l=>out.push('　'+l));
+  });
+  out.push('退場SE');
+  if(kind==='pa')EXIT_PA.split('\n').forEach(l=>out.push('　'+l));
+  out.push('合計　'+fmt(state.set.reduce((a,i)=>a+(parseFloat(i.len)||0),0))+'分');
+  const notes=String(kind==='pa'?state.paNotes:state.lightNotes).split('\n').map(s=>s.trim()).filter(Boolean);
+  if(notes.length){out.push('');notes.forEach(l=>out.push('・'+l))}
+  return out.join('\n');
+}
+async function saveFile(filename,data){
+  let dl=null;
+  try{dl=await window.claude.use('downloads')}catch(e){}
+  if(!dl){try{const b=new Blob([data],{type:'text/plain;charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);toast('保存しました');return true}catch(e){toast('保存できませんでした');return false}}
+  try{await dl.save({filename,data});toast('保存しました');return true}
+  catch(e){if(e&&e.code==='declined')return false;toast('保存できませんでした（'+((e&&e.code)||'error')+'）');return false}
+}
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t);toast('コピーしました')}
+  catch(e){
+    const box=$('#copyBox');box.hidden=false;box.value=t;box.focus();box.select();
+    toast('自動コピーできませんでした。選択済みのテキストをコピーしてください。');
+  }
+}
+$('#btnSaveHtml').addEventListener('click',()=>{
+  if(!selectedPages().length){toast('出力するページを選んでください');return}
+  saveFile((fileBase()||'要望シート')+'.html',buildExport());
+});
+$('#btnCopyPa').addEventListener('click',()=>copyText(textFor('pa')));
+$('#btnCopyLight').addEventListener('click',()=>copyText(textFor('light')));
+
+/* ---------- 公演メモ・バックアップ ---------- */
+function renderMemo(){
+  const ul=$('#snapList');
+  ul.innerHTML=state.saved.length?state.saved.slice().reverse().map(s=>`<li data-id="${s.id}"><span class="nm">${esc(s.label)}</span><span class="at">${esc(new Date(s.at).toLocaleDateString('ja-JP'))} 保存</span><button class="btn small" type="button" data-sn="load">呼び出す</button><button class="btn small danger" type="button" data-sn="del">削除</button></li>`).join(''):'<li><span class="hint">保存した公演はまだありません。</span></li>';
+}
+$('#snapList').addEventListener('click',e=>{
+  const b=e.target.closest('[data-sn]');if(!b)return;
+  const li=b.closest('li');const s=state.saved.find(x=>x.id===li.dataset.id);if(!s)return;
+  if(b.dataset.sn==='load'){
+    arm(b,'いまの内容を置き換える？',()=>{
+      const d=clone(s.data);
+      state.event=Object.assign({},state.event,d.event);state.set=d.set.filter(i=>!(i.k==='se'&&i.title==='退場SE'));state.paNotes=d.paNotes;state.lightNotes=d.lightNotes;
+      renderAll();touch();toast('呼び出しました');
+    });
+  }else{
+    arm(b,'本当に削除？',()=>{state.saved=state.saved.filter(x=>x.id!==s.id);renderMemo();touch()});
+  }
+});
+$('#btnSnap').addEventListener('click',()=>{
+  const e=state.event;
+  const label=(fmtDate(e.date)||'日付なし')+' '+(e.venue||'会場未設定');
+  state.saved.push({id:uid(),label,at:Date.now(),data:clone({event:state.event,set:state.set,paNotes:state.paNotes,lightNotes:state.lightNotes})});
+  renderMemo();touch();toast('保存しました：'+label);
+});
+$('#btnNew').addEventListener('click',function(){
+  arm(this,'空にする？もう一度押す',()=>{
+    state.event.date='';state.event.venue='';state.set=[];
+    renderAll();touch();toast('新しい公演を始めました');
+  });
+});
+$('#btnBackup').addEventListener('click',()=>{
+  saveFile('yobo-sheet-backup.json',JSON.stringify(state,null,1));
+});
+$('#fileIn').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{state=normalize(JSON.parse(r.result));renderAll();touch();toast('バックアップを読み込みました')}
+    catch(err){toast('読み込めませんでした。バックアップファイルを確認してください。')}
+    e.target.value='';
+  };
+  r.readAsText(f);
+});
+
+/* ---------- タブ・初期化 ---------- */
+const TABS=['set','lib','stage','preview'];
+function show(t){
+  TABS.forEach(k=>{
+    $('#p-'+k).hidden=k!==t;
+    $('#t-'+k).setAttribute('aria-selected',k===t?'true':'false');
+  });
+  if(t==='preview')renderPreview();
+  if(t==='stage')fitStage();
+}
+$$('.tab').forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab)));
+
+function renderAll(){
+  bindFields();renderPick();renderSet();renderLib();renderStage();renderMemo();updateTotal();renderPreview();
+}
+renderAll();
+if(window.ResizeObserver){
+  new ResizeObserver(fitStage).observe($('#stageEdit'));
+  new ResizeObserver(fitPages).observe($('#pages'));
+}
+setStatus(state.savedAt?'local':'local');
+connectDb();
+})();
+</script>
+
+</body>
+</html>
