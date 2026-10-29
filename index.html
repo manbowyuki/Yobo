@@ -302,7 +302,7 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
   <section id="p-lib" role="tabpanel" aria-labelledby="t-lib" hidden>
     <div class="set-bar">
       <div class="l"><h2>曲ライブラリ</h2><span class="hint">曲名・BPM・長さ・PA/照明の要望を一度登録しておくと、毎回呼び出せます。</span></div>
-      <button class="btn primary" id="btnAddLib" type="button">＋曲を登録</button>
+      <div class="btns"><button class="btn" id="btnExportLib" type="button">共有用に書き出す（library.json）</button><button class="btn primary" id="btnAddLib" type="button">＋曲を登録</button></div>
     </div>
     <ul class="lib-list" id="libList"></ul>
   </section>
@@ -435,34 +435,28 @@ function loadLocal(){
   return null;
 }
 
-/* ---------- ライブラリ一括取り込み（一度だけ） ---------- */
-const EXTRA_LIB=[
-  {title:'leroyのテーマ',bpm:134,len:4,pa:'全体を通して３人が歌います。',light:'緑、黄色など。ミラーボール、逆光強め'},
-  {title:'コーク、ニューヨーク、リバティーアイランド',bpm:192,len:2.5,pa:'Ba/Voメイン\nサビでGtもコーラス、Cメロはドラムコーラスが入ります。',light:'赤/青 パンキッシュな感じ。\nCメロは一度落としてラスサビで明るく'},
-  {title:'カレーライス',bpm:123,len:3,pa:'ギターボーカルメイン\nサビでベース、ドラムコーラス入ります',light:'オレンジメイン、夕日・ドラマチックなイメージ'},
-  {title:'I’m happy',bpm:100,len:4,pa:'ギターボーカルメイン\nサビでドラムコーラス入ります',light:'赤メイン、ギターソロでストロボ'},
-  {title:'AM5',bpm:134,len:3.5,pa:'Gt/VoメインCメロでBa、Drコーラス入ります\nドラム３点やや大きめ',light:'ストロボ・ストロボ・ストロボ'},
-  {title:'右手は添えるだけ',bpm:130,len:4.5,pa:'Gt/Voメイン、Baコーラス入ります',light:'赤・青で怪しいイメージ　サビは明るく'},
-  {title:'宇宙花火',bpm:130,len:3.5,pa:'Ba/Voメイン、サビはGtコーラス、ラスサビDrコーラスも。',light:'紫色でキラキラ宇宙っぽい感じ、ミラーボール'},
-  {title:'紫',bpm:130,len:4,pa:'Gt/Voメイン、Baコーラス入ります。',light:'最初は青基調で静かな感じ、だんだん明るく逆光強めで'},
-  {title:'美しくあれ',bpm:138,len:3,pa:'Gt/Vo、Ba/Voのツインボーカルです',light:'明るく楽しい雰囲気で'},
-  {title:'Boy Meets Love',bpm:134,len:4,pa:'Gt/Voメイン、Baコーラス入ります。',light:'赤・青/紫・緑などサイケデリックなイメージで'},
-  {title:'まとめてPIZZAに！',bpm:139,len:4,pa:'Ba/Vo、Gt/Voツインボーカル',light:'暖色系+緑、カラフルに激しく'},
-  {title:'まわるまわるJKローリング',bpm:178,len:2.5,pa:'Ba/Vo、Gt/Voツインボーカル、ラスサビDr Choあり',light:'黄色、オレンジなど暖色系で激しく'}
-];
-function applyImport(s){
-  if(!Array.isArray(s.imported))s.imported=[];
-  if(s.imported.indexOf('lib2')>=0)return false;
-  EXTRA_LIB.forEach(t=>{
-    if(!s.lib.some(x=>x.title===t.title))s.lib.push(Object.assign({id:'x'+uid()},t));
-  });
-  s.imported.push('lib2');
-  return true;
+/* ---------- 共有ライブラリ（library.json） ---------- */
+async function loadShared(){
+  try{
+    const r=await fetch('library.json',{cache:'no-cache'});
+    if(!r.ok)return;
+    const j=await r.json();
+    const list=Array.isArray(j.songs)?j.songs:[];
+    let ch=false;
+    list.forEach(t=>{
+      if(!t||!t.title)return;
+      let s=state.lib.find(x=>x.id===t.id)||state.lib.find(x=>x.title===t.title);
+      if(!s){state.lib.push({id:t.id||('s'+uid()),title:t.title,bpm:t.bpm,len:t.len,pa:t.pa||'',light:t.light||'',rev:t.rev||0});ch=true;return}
+      if(s.id!==t.id&&t.id){state.set.forEach(i=>{if(i.songId===s.id)i.songId=t.id});s.id=t.id;ch=true}
+      if(s.rev==null){s.rev=t.rev||0;ch=true}
+      else if(s.rev<(t.rev||0)){Object.assign(s,{title:t.title,bpm:t.bpm,len:t.len,pa:t.pa||'',light:t.light||'',rev:t.rev});delete s.dirty;ch=true}
+    });
+    if(ch){touch();renderAll();toast('共有ライブラリを更新しました')}
+  }catch(e){}
 }
 
 /* ---------- 保存 ---------- */
 let state=loadLocal()||normalize(seed());
-if(applyImport(state)){state.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 let dbDoc=null,dbBusy=false,dbDirty=false,saveTimer=0,mode='local';
 function setStatus(kind){
   const t={saving:'保存中…',cloud:'クラウドに保存済み',local:'この端末に保存済み',view:'閲覧のみ・この端末に保存'}[kind]||'';
@@ -498,7 +492,7 @@ async function connectDb(){
     if(snap.exists){
       const d=snap.data()||{};
       if((d.savedAt||0)>(state.savedAt||0)){
-        try{state=normalize(JSON.parse(d.json));const ch=applyImport(state);if(ch)state.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){};renderAll();if(ch)flush();else setStatus('cloud');return}catch(e){}
+        try{state=normalize(JSON.parse(d.json));try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){};renderAll();setStatus('cloud');return}catch(e){}
       }
     }
     if(state.savedAt){flush()}else{mode='cloud';setStatus('cloud')}
@@ -651,7 +645,7 @@ setList.addEventListener('click',e=>{
     });
   }else if(b.dataset.act==='tolib'){
     const s=state.lib.find(x=>x.id===it.songId);
-    if(s){Object.assign(s,{title:it.title,bpm:it.bpm,len:it.len,pa:it.pa,light:it.light});renderLib();renderPick();touch();toast('ライブラリを更新しました')}
+    if(s){Object.assign(s,{title:it.title,bpm:it.bpm,len:it.len,pa:it.pa,light:it.light,dirty:true});renderLib();renderPick();touch();toast('ライブラリを更新しました')}
   }
 });
 setList.addEventListener('pointerdown',e=>{
@@ -721,7 +715,7 @@ libList.addEventListener('input',e=>{
   const f=e.target.dataset.f;if(!f)return;
   const li=e.target.closest('.lib-row');const s=state.lib.find(x=>x.id===li.dataset.id);if(!s)return;
   s[f]=(f==='bpm'||f==='len')?numOrEmpty(e.target.value):e.target.value;
-  touch();renderPick();
+  s.dirty=true;touch();renderPick();
 });
 libList.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
@@ -733,6 +727,14 @@ libList.addEventListener('click',e=>{
       renderLib();renderPick();touch();
     });
   }
+});
+
+$('#btnExportLib').addEventListener('click',()=>{
+  const now=Math.floor(Date.now()/1000);
+  state.lib.forEach(s=>{if(s.dirty||!s.rev){s.rev=now;delete s.dirty}});
+  touch();
+  const songs=state.lib.map(s=>({id:s.id,title:s.title,bpm:s.bpm,len:s.len,pa:s.pa,light:s.light,rev:s.rev}));
+  saveFile('library.json',JSON.stringify({songs},null,1));
 });
 
 /* ---------- セット図 ---------- */
@@ -1008,7 +1010,7 @@ if(window.ResizeObserver){
   new ResizeObserver(fitPages).observe($('#pages'));
 }
 setStatus(state.savedAt?'local':'local');
-connectDb();
+connectDb().then(loadShared);
 })();
 </script>
 
