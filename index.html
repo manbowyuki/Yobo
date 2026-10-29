@@ -269,7 +269,7 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
   <section id="p-set" role="tabpanel" aria-labelledby="t-set">
     <div class="cols">
       <aside class="card rail" aria-label="曲ライブラリ">
-        <h2>曲ライブラリ</h2>
+        <h2>曲ライブラリ <span class="pill" id="libCountRail"></span></h2>
         <p class="hint">押すとセットリストの末尾に入ります。</p>
         <ul class="picks" id="pick"></ul>
       </aside>
@@ -301,7 +301,7 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
 
   <section id="p-lib" role="tabpanel" aria-labelledby="t-lib" hidden>
     <div class="set-bar">
-      <div class="l"><h2>曲ライブラリ</h2><span class="hint">曲名・BPM・長さ・PA/照明の要望を一度登録しておくと、毎回呼び出せます。</span></div>
+      <div class="l"><h2>曲ライブラリ</h2><span class="pill" id="libCount"></span><span class="hint">曲名・BPM・長さ・PA/照明の要望を一度登録しておくと、毎回呼び出せます。</span></div>
       <div class="btns"><button class="btn" id="btnExportLib" type="button">共有用に書き出す（library.json）</button><button class="btn primary" id="btnAddLib" type="button">＋曲を登録</button></div>
     </div>
     <ul class="lib-list" id="libList"></ul>
@@ -590,6 +590,8 @@ function renumber(){
   });
 }
 function renderPick(){
+  const nLib='全'+state.lib.length+'曲';
+  $('#libCount').textContent=nLib;$('#libCountRail').textContent=nLib;
   const used=new Map();
   state.set.forEach(i=>{if(i.songId)used.set(i.songId,(used.get(i.songId)||0)+1)});
   $('#pick').innerHTML=state.lib.length?state.lib.map(s=>`<li><button class="pick" type="button" data-add-song="${s.id}">
