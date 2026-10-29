@@ -163,6 +163,8 @@ textarea{resize:vertical;line-height:1.5;min-height:3.4em;field-sizing:content}
 .row.k-mc{border-left-color:var(--warn)}
 .row.k-se,.row.k-free{border-left-color:var(--muted)}
 .row.dragging{box-shadow:0 10px 28px rgba(0,0,0,.28);position:relative;z-index:5;border-color:var(--accent)}
+#setList.is-dragging{user-select:none;-webkit-user-select:none}
+.row.dragging{will-change:transform;opacity:.97}
 .row.flash{animation:flash 1.2s ease-out}
 @keyframes flash{from{background:var(--accent-soft)}to{background:var(--panel)}}
 @media (prefers-reduced-motion:reduce){.row.flash{animation:none}}
@@ -325,8 +327,8 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
         </div>
         <div class="note-tg" role="group" aria-label="要望の表示">
           <span class="k">要望の表示</span>
-          <button class="tg" type="button" data-tg="pa" aria-pressed="true"><span class="sw" aria-hidden="true"></span>PA</button>
-          <button class="tg" type="button" data-tg="light" aria-pressed="true"><span class="sw" aria-hidden="true"></span>照明</button>
+          <button class="tg" type="button" data-tg="pa" aria-pressed="false"><span class="sw" aria-hidden="true"></span>PA</button>
+          <button class="tg" type="button" data-tg="light" aria-pressed="false"><span class="sw" aria-hidden="true"></span>照明</button>
         </div>
         <ol class="rows" id="setList"></ol>
         <div class="fixed-row"><strong>退場SE</strong><span>固定です（編集・移動・削除はできません）。表の最後、合計の上に自動で入ります。長さは空欄です。</span></div>
@@ -637,13 +639,13 @@ function rowHTML(it){
 }
 function applyNoteTg(){
   const v=state.showNotes||{};
-  const pa=v.pa!==false,lt=v.light!==false;
+  const pa=v.pa===true,lt=v.light===true;
   $('#setList').classList.toggle('hide-pa',!pa);
   $('#setList').classList.toggle('hide-light',!lt);
   $$('[data-tg]').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.tg==='pa'?pa:lt)?'true':'false'));
 }
 $$('[data-tg]').forEach(b=>b.addEventListener('click',()=>{
-  state.showNotes=Object.assign({pa:true,light:true},state.showNotes);
+  state.showNotes=Object.assign({pa:false,light:false},state.showNotes);
   state.showNotes[b.dataset.tg]=!state.showNotes[b.dataset.tg];
   applyNoteTg();touch();
 }));
@@ -744,23 +746,66 @@ $('#swapBg').addEventListener('click',e=>{
   }else closeSwap();
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#swapBg').hidden)closeSwap()});
+const REDUCE=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function flipRows(skip,mutate){
+  const rows=Array.from(setList.children).filter(x=>x!==skip);
+  const first=new Map(rows.map(r=>[r,r.getBoundingClientRect().top]));
+  mutate();
+  if(REDUCE)return;
+  rows.forEach(r=>{
+    const dy=first.get(r)-r.getBoundingClientRect().top;
+    if(!dy)return;
+    r.style.transition='none';r.style.transform=`translateY(${dy}px)`;
+  });
+  void setList.offsetHeight;
+  rows.forEach(r=>{
+    if(!r.style.transform)return;
+    r.style.transition='transform .24s cubic-bezier(.2,.8,.2,1)';r.style.transform='';
+    const clear=()=>{r.style.transition='';r.removeEventListener('transitionend',clear)};
+    r.addEventListener('transitionend',clear);
+  });
+}
 setList.addEventListener('pointerdown',e=>{
   const h=e.target.closest('.handle');if(!h)return;
   const li=h.closest('.row');
   e.preventDefault();
   try{h.setPointerCapture(e.pointerId)}catch(err){}
+  const r0=li.getBoundingClientRect();
+  const grab=e.clientY-r0.top;
   li.classList.add('dragging');
+  setList.classList.add('is-dragging');
+  const place=y=>{
+    li.style.transition='none';li.style.transform='';
+    const rt=li.getBoundingClientRect().top;
+    li.style.transform=`translateY(${y-grab-rt}px) scale(1.02)`;
+  };
+  place(e.clientY);
   const mv=ev=>{
     const y=ev.clientY;
+    const ulTop=setList.getBoundingClientRect().top;
+    const base=setList.firstElementChild.offsetTop;
     const sibs=Array.from(setList.children).filter(x=>x!==li);
     let before=null;
-    for(const s of sibs){const r=s.getBoundingClientRect();if(y<r.top+r.height/2){before=s;break}}
-    if(li.nextElementSibling!==before){setList.insertBefore(li,before);renumber()}
+    for(const s of sibs){
+      const top=ulTop+(s.offsetTop-base);
+      if(y<top+s.offsetHeight/2){before=s;break}
+    }
+    if(li.nextElementSibling!==before){
+      flipRows(li,()=>{setList.insertBefore(li,before);renumber()});
+    }
+    place(y);
     if(y<70)window.scrollBy(0,-14);else if(y>window.innerHeight-70)window.scrollBy(0,14);
   };
   const up=()=>{
     h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',up);h.removeEventListener('pointercancel',up);
-    li.classList.remove('dragging');
+    setList.classList.remove('is-dragging');
+    if(REDUCE){li.style.transform='';li.style.transition='';li.classList.remove('dragging')}
+    else{
+      li.style.transition='transform .22s cubic-bezier(.2,.8,.2,1)';li.style.transform='';
+      const done=()=>{li.style.transition='';li.classList.remove('dragging');li.removeEventListener('transitionend',done)};
+      li.addEventListener('transitionend',done);
+      setTimeout(done,320);
+    }
     const ids=Array.from(setList.querySelectorAll('.row')).map(x=>x.dataset.id);
     state.set=ids.map(id=>state.set.find(x=>x.id===id)).filter(Boolean);
     touch();schedulePreview();
