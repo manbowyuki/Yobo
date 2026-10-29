@@ -59,6 +59,16 @@ input,textarea,select{
 }
 input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:1px}
 input[type=checkbox]{width:auto;accent-color:var(--accent)}
+.swap-bg{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+.swap-bg[hidden]{display:none}
+.swap-box{background:var(--panel);color:var(--ink);width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;border-radius:14px 14px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.25)}
+@media (min-width:600px){.swap-bg{align-items:center}.swap-box{border-radius:14px}}
+.swap-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 8px}
+.swap-head h3{margin:0;font-size:16px}
+.swap-sub{padding:0 16px 8px;font-size:13px;color:var(--muted)}
+.swap-list{list-style:none;margin:0;padding:0 12px 16px;overflow-y:auto;display:grid;gap:6px}
+.swap-list .pick .pk-plus{display:none}
+.swap-list .pick.cur{border-color:var(--accent)}
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;box-sizing:border-box;max-width:100%;min-height:38px;text-align:left}
 input[type=date]::-webkit-date-and-time-value{text-align:left;min-width:0}
 textarea{resize:vertical;line-height:1.5;min-height:3.4em;field-sizing:content}
@@ -364,6 +374,13 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+<div class="swap-bg" id="swapBg" hidden>
+  <div class="swap-box" role="dialog" aria-modal="true" aria-labelledby="swapTitle">
+    <div class="swap-head"><h3 id="swapTitle">曲を入れ替え</h3><button class="btn small" type="button" id="swapClose">閉じる</button></div>
+    <p class="swap-sub" id="swapSub"></p>
+    <ul class="swap-list" id="swapList"></ul>
+  </div>
+</div>
 <script>
 (function(){
 'use strict';
@@ -589,6 +606,7 @@ function rowHTML(it){
     ${song?`<label class="mini-fld"><span class="k">BPM</span><input type="number" min="0" step="1" data-f="bpm" value="${esc(it.bpm)}" aria-label="BPM"></label>`:''}
     <label class="mini-fld len"><span class="k">長さ</span><input type="number" min="0" step="0.5" data-f="len" value="${esc(it.len)}" aria-label="長さ（分）"><span class="u">分</span></label>
     <span class="r-actions">
+      ${song?'<button class="btn small" type="button" data-act="swap">曲を入れ替え</button>':''}
       ${song&&it.songId&&state.lib.some(s=>s.id===it.songId)?'<button class="btn small" type="button" data-act="tolib" title="この行の内容を曲ライブラリに上書き">ライブラリへ反映</button>':''}
       <button class="btn small danger" type="button" data-act="del">削除</button>
     </span>
@@ -667,11 +685,35 @@ setList.addEventListener('click',e=>{
       state.set=state.set.filter(x=>x.id!==it.id);
       renderSet();renderPick();updateTotal();touch();schedulePreview();
     });
+  }else if(b.dataset.act==='swap'){
+    openSwap(it);
   }else if(b.dataset.act==='tolib'){
     const s=state.lib.find(x=>x.id===it.songId);
     if(s){Object.assign(s,{title:it.title,bpm:it.bpm,len:it.len,pa:it.pa,light:it.light,dirty:true});renderLib();renderPick();touch();toast('ライブラリを更新しました')}
   }
 });
+let swapId=null;
+function openSwap(it){
+  swapId=it.id;
+  $('#swapSub').textContent='「'+(it.title||'この曲')+'」を入れ替える曲を選んでください。';
+  $('#swapList').innerHTML=sortedLib().map(s=>`<li><button class="pick${s.id===it.songId?' cur':''}" type="button" data-swap-to="${s.id}">
+    <span class="pk-t">${esc(s.title)}${s.id===it.songId?'<em class="used">今の曲</em>':''}</span>
+    <span class="pk-m">${s.bpm?esc(s.bpm)+' BPM':''}${s.bpm&&s.len?' · ':''}${s.len?esc(fmt(s.len))+'分':''}</span></button></li>`).join('')||'<li class="empty">曲ライブラリが空です。</li>';
+  $('#swapBg').hidden=false;
+}
+function closeSwap(){$('#swapBg').hidden=true;swapId=null}
+$('#swapClose').addEventListener('click',closeSwap);
+$('#swapBg').addEventListener('click',e=>{
+  if(e.target.id==='swapBg')return closeSwap();
+  const b=e.target.closest('[data-swap-to]');if(!b)return;
+  const it=state.set.find(x=>x.id===swapId),s=state.lib.find(x=>x.id===b.dataset.swapTo);
+  if(it&&s){
+    Object.assign(it,{songId:s.id,title:s.title,bpm:s.bpm,len:s.len,pa:s.pa,light:s.light});
+    const id=it.id;closeSwap();
+    renderSet();renderPick();updateTotal();touch();schedulePreview();flashRow(id);
+  }else closeSwap();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#swapBg').hidden)closeSwap()});
 setList.addEventListener('pointerdown',e=>{
   const h=e.target.closest('.handle');if(!h)return;
   const li=h.closest('.row');
