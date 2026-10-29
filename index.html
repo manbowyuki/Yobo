@@ -59,6 +59,8 @@ input,textarea,select{
 }
 input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:1px}
 input[type=checkbox]{width:auto;accent-color:var(--accent)}
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;box-sizing:border-box;max-width:100%;min-height:38px;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left;min-width:0}
 textarea{resize:vertical;line-height:1.5;min-height:3.4em;field-sizing:content}
 .mono,input[type=number]{font-family:var(--f-num);font-variant-numeric:tabular-nums}
 .btn{
@@ -244,9 +246,7 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
   <header class="top">
     <div class="brand">
       <h1>要望シートメーカー</h1>
-      <p>PA要望・照明要望・セット図を、ライブごとに組み替えてA4で出します。</p>
     </div>
-    <p id="saveState" class="state" role="status" aria-live="polite">読み込み中…</p>
   </header>
 
   <section class="card" aria-labelledby="h-event">
@@ -481,7 +481,7 @@ let state=loadLocal()||normalize(seed());
 let dbDoc=null,dbBusy=false,dbDirty=false,saveTimer=0,mode='local';
 function setStatus(kind){
   const t={saving:'保存中…',cloud:'クラウドに保存済み',local:'この端末に保存済み',view:'閲覧のみ・この端末に保存'}[kind]||'';
-  $('#saveState').textContent=t;
+  const el=$('#saveState');if(el)el.textContent=t;
 }
 function touch(){
   state.savedAt=Date.now();
