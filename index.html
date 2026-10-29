@@ -1140,32 +1140,19 @@ async function doShare(file){
   try{await navigator.share({files:[file]});return 'ok'}
   catch(e){return (e&&e.name==='AbortError')?'cancel':(e&&e.name==='NotAllowedError')?'gesture':'error'}
 }
+/* LINEなどの共有先は、ブラウザの共有機能(Web Share)に渡したデータには出ないことがあるため、
+   PDFを実ファイルとして保存し、そこからiPhone標準の共有で送れるようにする */
 function sharePdf(){
   const btn=$('#btnSharePdf');
   if(pdfBusy)return;
   if(!selectedPages().length){toast('出力するページを選んでください');return}
-  // 準備済みなら、待たずにそのまま共有画面を開く
-  if(pdfCache.file&&pdfCache.key===pdfKey()){
-    const f=pdfCache.file;
-    if(!canShareFile(f)){toast('このブラウザは共有に対応していないため、保存します');return saveFile(f.name,f)}
-    return doShare(f).then(r=>{
-      if(r==='error'){toast('共有できなかったため、保存します');return saveFile(f.name,f)}
-    });
-  }
-  // 未準備：作ってから共有（拒否されたらもう一度タップで共有）
+  if(pdfCache.file&&pdfCache.key===pdfKey()){const f=pdfCache.file;return saveFile(f.name,f)}
   pdfBusy=true;
   const label=btn.innerHTML;
   btn.disabled=true;btn.textContent='PDFを作成中…';
-  return ensurePdfFile().then(async f=>{
-    btn.disabled=false;btn.innerHTML=label;pdfBusy=false;
-    if(!canShareFile(f)){toast('このブラウザは共有に対応していないため、保存します');return saveFile(f.name,f)}
-    const r=await doShare(f);
-    if(r==='gesture')toast('PDFができました。もう一度「PDFで共有」を押してください');
-    else if(r==='error'){toast('共有できなかったため、保存します');return saveFile(f.name,f)}
-  }).catch(()=>{
-    btn.disabled=false;btn.innerHTML=label;pdfBusy=false;
+  return ensurePdfFile().then(f=>saveFile(f.name,f)).catch(()=>{
     toast('PDFを作成できませんでした。通信状況を確認してください');
-  });
+  }).finally(()=>{btn.disabled=false;btn.innerHTML=label;pdfBusy=false});
 }
 $('#btnSharePdf').addEventListener('click',sharePdf);
 
