@@ -385,10 +385,9 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
         <label><input type="checkbox" data-bind="out.stage"> セット図</label>
       </fieldset>
       <div class="btns">
-        <button class="btn primary" id="btnSavePdf" type="button">A4シートをPDFで保存</button>
+        <button class="btn primary" id="btnSharePdf" type="button"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>PDFで共有</button>
       </div>
     </div>
-    <p class="hint">選んだページをA4のPDFにして保存します。</p>
     <div id="pages"></div>
   </section>
 </div>
@@ -1065,12 +1064,7 @@ async function ensurePdfLibs(){
   if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 }
 let pdfBusy=false;
-async function savePdf(){
-  if(pdfBusy)return;
-  if(!selectedPages().length){toast('出力するページを選んでください');return}
-  pdfBusy=true;
-  const btn=$('#btnSavePdf'),label=btn.innerHTML;
-  btn.disabled=true;btn.textContent='PDFを作成中…';
+async function makePdf(){
   const box=document.createElement('div');
   box.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;pointer-events:none';
   try{
@@ -1083,21 +1077,57 @@ async function savePdf(){
     const PW=pdf.internal.pageSize.getWidth(),PH=pdf.internal.pageSize.getHeight();
     const pages=Array.from(box.querySelectorAll('.page'));
     for(let i=0;i<pages.length;i++){
-      const el=pages[i];
-      const cv=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,windowWidth:794});
+      const cv=await window.html2canvas(pages[i],{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,windowWidth:794});
       let w=PW,h=PW*cv.height/cv.width;
       if(h>PH){h=PH;w=PH*cv.width/cv.height}
       if(i>0)pdf.addPage();
       pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',(PW-w)/2,0,w,h);
     }
-    await saveFile((fileBase()||'要望シート')+'.pdf',pdf.output('blob'));
+    return pdf.output('blob');
+  }finally{box.remove()}
+}
+async function runPdf(btn,after){
+  if(pdfBusy)return;
+  if(!selectedPages().length){toast('出力するページを選んでください');return}
+  pdfBusy=true;
+  const label=btn.innerHTML;
+  btn.disabled=true;btn.textContent='PDFを作成中…';
+  try{
+    const blob=await makePdf();
+    await after(blob);
   }catch(e){
     toast('PDFを作成できませんでした。通信状況を確認してください');
   }finally{
-    box.remove();btn.disabled=false;btn.innerHTML=label;pdfBusy=false;
+    btn.disabled=false;btn.innerHTML=label;pdfBusy=false;
   }
 }
-$('#btnSavePdf').addEventListener('click',savePdf);
+const pdfName=()=>(fileBase()||'要望シート')+'.pdf';
+function savePdf(){return runPdf($('#btnSharePdf'),blob=>saveFile(pdfName(),blob))}
+/* 共有：ファイルだけを渡す（URL・本文は付けない） */
+let pendingShare=null;
+function canShareFiles(){
+  try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'])],'a.pdf',{type:'application/pdf'})]}))}catch(e){return false}
+}
+async function doShare(file){
+  try{await navigator.share({files:[file]});return 'ok'}
+  catch(e){return (e&&e.name==='AbortError')?'cancel':(e&&e.name==='NotAllowedError')?'gesture':'error'}
+}
+function sharePdf(){
+  if(!canShareFiles())return savePdf();
+  const btn=$('#btnSharePdf');
+  if(pendingShare){
+    const f=pendingShare;pendingShare=null;btn.innerHTML=btn.dataset.label;
+    return doShare(f).then(r=>{if(r==='error')toast('共有できませんでした。もう一度お試しください')});
+  }
+  btn.dataset.label=btn.innerHTML;
+  return runPdf(btn,async blob=>{
+    const file=new File([blob],pdfName(),{type:'application/pdf'});
+    const r=await doShare(file);
+    if(r==='gesture'){pendingShare=file;toast('PDFができました。もう一度タップして共有してください');setTimeout(()=>{btn.innerHTML='PDFができました。タップして共有'},0)}
+    else if(r==='error')toast('共有できませんでした。もう一度お試しください');
+  });
+}
+$('#btnSharePdf').addEventListener('click',sharePdf);
 
 /* ---------- ライブメモ ---------- */
 function renderMemo(){
