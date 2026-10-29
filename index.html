@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@400;500;700;900&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
 <style>
-/* Layout concept: 卓（ミキサー）の作業台。上に公演情報、タブの下で「曲ライブラリのレール＋セットリストのチャンネル列」を並べ替える。出力はいつも白いA4紙面。 */
+/* Layout concept: 卓（ミキサー）の作業台。上にライブ情報、タブの下で「曲ライブラリのレール＋セットリストのチャンネル列」を並べ替える。出力はいつも白いA4紙面。 */
 :root{
   --bg:#e9ecf0; --panel:#ffffff; --panel-2:#f3f5f8; --ink:#14171c; --muted:#586170; --line:#cfd5dd;
   --accent:#2c47f0; --accent-ink:#ffffff; --accent-soft:#e1e6ff;
@@ -82,6 +82,10 @@ textarea{resize:vertical;line-height:1.5;min-height:3.4em;field-sizing:content}
 .snaps .nm{flex:1 1 180px;font-weight:700;min-width:0}
 .snaps .at{font-family:var(--f-num);font-size:12px;color:var(--muted)}
 
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;vertical-align:middle}
+.seg-b{font:inherit;font-size:12px;font-weight:700;padding:4px 11px;background:var(--panel);color:var(--muted);border:0;cursor:pointer}
+.seg-b+.seg-b{border-left:1px solid var(--line)}
+.seg-b[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .tabs{display:flex;gap:2px;border-bottom:2px solid var(--line);margin:20px 0 16px;overflow-x:auto}
 .tab{
   font-family:var(--f-head);font-weight:900;font-size:15px;padding:10px 16px;background:none;border:0;color:var(--muted);
@@ -169,7 +173,6 @@ textarea{resize:vertical;line-height:1.5;min-height:3.4em;field-sizing:content}
 fieldset.out-sel{border:1px solid var(--line);border-radius:8px;padding:6px 12px 8px;margin:0;display:flex;gap:16px;flex-wrap:wrap}
 fieldset.out-sel legend{font-size:12px;font-weight:700;color:var(--muted);padding:0 6px}
 fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
-#copyBox{margin:10px 0;min-height:140px}
 #pages{margin-top:14px;display:flex;flex-direction:column;gap:18px}
 .pwrap{position:relative;overflow:hidden;width:100%;background:var(--bg)}
 .pwrap .page{transform-origin:0 0;position:absolute;left:0;top:0;box-shadow:0 2px 14px rgba(0,0,0,.22)}
@@ -212,7 +215,7 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
 .si.box .sb{margin-top:calc(var(--u)*1)}
 .si svg{display:block;margin:calc(var(--u)*4) auto 0;width:calc(var(--u)*40);height:calc(var(--u)*84);overflow:visible;fill:none;stroke:currentColor;stroke-width:2}
 .si.mic{display:flex;align-items:center;gap:calc(var(--u)*6)}
-.si.mic svg{width:calc(var(--u)*34);height:calc(var(--u)*34);margin:0}
+.si.mic svg{width:calc(var(--u)*48);height:calc(var(--u)*48);margin:0}
 .si.text{font-size:calc(var(--u)*12.5);max-width:calc(var(--u)*330)}
 </style>
 
@@ -223,13 +226,13 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
   <header class="top">
     <div class="brand">
       <h1>要望シートメーカー</h1>
-      <p>PA要望・照明要望・セット図を、公演ごとに組み替えてA4で出します。</p>
+      <p>PA要望・照明要望・セット図を、ライブごとに組み替えてA4で出します。</p>
     </div>
     <p id="saveState" class="state" role="status" aria-live="polite">読み込み中…</p>
   </header>
 
   <section class="card" aria-labelledby="h-event">
-    <h2 id="h-event">公演情報</h2>
+    <h2 id="h-event">ライブ情報</h2>
     <div class="fields">
       <label class="fld"><span>バンド名</span><input id="f-band" data-bind="event.band" autocomplete="off"></label>
       <label class="fld"><span>読み</span><input id="f-kana" data-bind="event.kana" autocomplete="off"></label>
@@ -238,23 +241,18 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
       <label class="fld"><span>持ち時間（分）</span><input id="f-min" type="number" min="0" step="1" data-bind="event.minutes"></label>
     </div>
     <details class="memo" id="memo">
-      <summary>公演の保存・呼び出し・バックアップ</summary>
+      <summary>シートの保存・呼び出し</summary>
       <div class="memo-body">
         <div class="memo-row">
-          <button class="btn" id="btnNew" type="button">新しい公演を始める</button>
+          <button class="btn" id="btnNew" type="button"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>新規シート作成</button>
           <span class="hint">日付・会場・セットリストを空にします。曲ライブラリとセット図は残ります。</span>
         </div>
         <div class="memo-row">
-          <button class="btn" id="btnSnap" type="button">いまの公演を保存</button>
+          <button class="btn" id="btnSnap" type="button"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/></svg>今のシートを保存</button>
           <span class="hint">日付と会場名で名前が付きます。あとから呼び出せます。</span>
         </div>
         <ul class="snaps" id="snapList"></ul>
-        <div class="memo-row">
-          <button class="btn" id="btnBackup" type="button">バックアップを書き出す</button>
-          <label class="btn" for="fileIn">バックアップを読み込む</label>
-          <input id="fileIn" type="file" accept=".json,application/json" hidden>
-        </div>
-        <p class="hint">データはクラウドに、使えない場合はこの端末に保存されます。端末を変える前はバックアップがあると安心です。</p>
+        <p class="hint">データはこのブラウザに保存されます。別のPCでは、保存したライブは引き継がれません。</p>
       </div>
     </details>
   </section>
@@ -270,6 +268,7 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
     <div class="cols">
       <aside class="card rail" aria-label="曲ライブラリ">
         <h2>曲ライブラリ <span class="pill" id="libCountRail"></span></h2>
+        <div style="margin:6px 0 8px"><span class="seg" role="group" aria-label="並び順"><button class="seg-b" type="button" data-sort="bpm" aria-pressed="true">BPM順</button><button class="seg-b" type="button" data-sort="len" aria-pressed="false">長さ順</button></span></div>
         <p class="hint">押すとセットリストの末尾に入ります。</p>
         <ul class="picks" id="pick"></ul>
       </aside>
@@ -301,8 +300,8 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
 
   <section id="p-lib" role="tabpanel" aria-labelledby="t-lib" hidden>
     <div class="set-bar">
-      <div class="l"><h2>曲ライブラリ</h2><span class="pill" id="libCount"></span><span class="hint">曲名・BPM・長さ・PA/照明の要望を一度登録しておくと、毎回呼び出せます。</span></div>
-      <div class="btns"><button class="btn" id="btnExportLib" type="button">共有用に書き出す（library.json）</button><button class="btn primary" id="btnAddLib" type="button">＋曲を登録</button></div>
+      <div class="l"><h2>曲ライブラリ</h2><span class="pill" id="libCount"></span><span class="seg" role="group" aria-label="並び順"><button class="seg-b" type="button" data-sort="bpm" aria-pressed="true">BPM順</button><button class="seg-b" type="button" data-sort="len" aria-pressed="false">長さ順</button></span><span class="hint">曲名・BPM・長さ・PA/照明の要望を一度登録しておくと、毎回呼び出せます。並び順は「BPM順」「長さ順」（どちらも小さい順）で切り替えられます。</span></div>
+      <div class="btns"><button class="btn primary" id="btnAddLib" type="button">＋曲を登録</button></div>
     </div>
     <ul class="lib-list" id="libList"></ul>
   </section>
@@ -339,12 +338,9 @@ fieldset.out-sel label{display:flex;gap:6px;align-items:center;font-weight:700}
       </fieldset>
       <div class="btns">
         <button class="btn primary" id="btnSaveHtml" type="button">A4シートを保存（HTML）</button>
-        <button class="btn" id="btnCopyPa" type="button"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>PA要望をテキストでコピー</button>
-        <button class="btn" id="btnCopyLight" type="button"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>照明要望をテキストでコピー</button>
       </div>
     </div>
-    <p class="hint">この画面からは印刷できないので、保存したHTMLを開いて「印刷 → PDFに保存」（A4・余白なし）でPDFにします。メールやLINEにはテキストコピーが便利です。</p>
-    <textarea id="copyBox" readonly hidden aria-label="コピー用テキスト"></textarea>
+    <p class="hint">保存したHTMLを開いて「印刷 → PDFに保存」（A4・余白なし）でPDFにします。</p>
     <div id="pages"></div>
   </section>
 </div>
@@ -410,7 +406,8 @@ function seed(){
         {id:'s6',kind:'text',label:'※上下両方マイクケーブルを\nマイクスタンドに巻かないでください\n（ハンドマイクに切り替えるときがあるため）',sub:'',x:50,y:55},
         {id:'s7',kind:'vocal',label:'Vo./Ba',sub:'(持込:マイクホルダー/\nTELEFUNKEN M80)',x:20,y:77},
         {id:'s8',kind:'vocal',label:'Vo./Gt',sub:'(持込:SHURE SM58)',x:80,y:77},
-        {id:'s9',kind:'box',label:'お立ち台',sub:'(お借りしたいです)',x:50,y:81}
+        {id:'s9',kind:'box',label:'お立ち台',sub:'(お借りしたいです)',x:50,y:81},
+        {id:'s10',kind:'text',label:'DI持ち込み',sub:'',x:18,y:37}
       ]
     },
     out:{pa:true,light:true,stage:true},
@@ -423,6 +420,12 @@ function normalize(s){
   o.event=Object.assign({},d.event,(s&&s.event)||{});
   o.stage=Object.assign({},d.stage,(s&&s.stage)||{});
   o.out=Object.assign({pa:true,light:true,stage:true},(s&&s.out)||{});
+  if(o.libSort!=='len')o.libSort='bpm';
+  if(!Array.isArray(o.imported))o.imported=[];
+  if(o.imported.indexOf('stage-di')<0){
+    if(!o.stage.items.some(i=>i.label==='DI持ち込み'))o.stage.items.push({id:'sdi',kind:'text',label:'DI持ち込み',sub:'',x:18,y:37});
+    o.imported.push('stage-di');
+  }
   ['lib','set','saved'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=[]});
   if(!Array.isArray(o.stage.items))o.stage.items=d.stage.items;
   const isExit=i=>i&&i.k==='se'&&i.title==='退場SE';
@@ -508,9 +511,9 @@ function toast(msg){
   clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3200);
 }
 function arm(btn,label,fn){
-  if(btn.dataset.armed){clearTimeout(btn._t);delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._old;fn();return}
-  btn.dataset.armed='1';btn._old=btn.textContent;btn.textContent=label;btn.classList.add('armed');
-  btn._t=setTimeout(()=>{delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._old},3000);
+  if(btn.dataset.armed){clearTimeout(btn._t);delete btn.dataset.armed;btn.classList.remove('armed');btn.innerHTML=btn._old;fn();return}
+  btn.dataset.armed='1';btn._old=btn.innerHTML;btn.innerHTML=label;btn.classList.add('armed');
+  btn._t=setTimeout(()=>{delete btn.dataset.armed;btn.classList.remove('armed');btn.innerHTML=btn._old},3000);
 }
 let pvTimer=0;
 function schedulePreview(){
@@ -591,10 +594,11 @@ function renumber(){
 }
 function renderPick(){
   const nLib='全'+state.lib.length+'曲';
+  $$('[data-sort]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.sort===state.libSort?'true':'false'));
   $('#libCount').textContent=nLib;$('#libCountRail').textContent=nLib;
   const used=new Map();
   state.set.forEach(i=>{if(i.songId)used.set(i.songId,(used.get(i.songId)||0)+1)});
-  $('#pick').innerHTML=state.lib.length?state.lib.map(s=>`<li><button class="pick" type="button" data-add-song="${s.id}">
+  $('#pick').innerHTML=state.lib.length?sortedLib().map(s=>`<li><button class="pick" type="button" data-add-song="${s.id}">
     <span class="pk-t">${esc(s.title)}${used.has(s.id)?'<em class="used">使用中</em>':''}</span>
     <span class="pk-m">${s.bpm?esc(s.bpm)+' BPM':''}${s.bpm&&s.len?' · ':''}${s.len?esc(fmt(s.len))+'分':''}</span>
     <span class="pk-plus" aria-hidden="true">＋</span></button></li>`).join(''):'<li class="empty">「曲ライブラリ」タブで曲を登録してください。</li>';
@@ -704,13 +708,26 @@ function libHTML(s){
   </div>
 </li>`;
 }
+function sortedLib(){
+  const n=x=>(x===''||x==null||!isFinite(Number(x)))?Infinity:Number(x);
+  const k1=state.libSort==='len'?'len':'bpm',k2=k1==='len'?'bpm':'len';
+  return state.lib.slice().sort((a,b)=>(n(a[k1])-n(b[k1]))||(n(a[k2])-n(b[k2]))||String(a.title).localeCompare(String(b.title),'ja'));
+}
+function setSort(k){
+  state.libSort=k==='len'?'len':'bpm';
+  touch();renderLib();renderPick();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-sort]');
+  if(b)setSort(b.dataset.sort);
+});
 function renderLib(){
-  $('#libList').innerHTML=state.lib.length?state.lib.map(libHTML).join(''):'<li class="empty">まだ曲がありません。「＋曲を登録」から追加してください。</li>';
+  $('#libList').innerHTML=state.lib.length?sortedLib().map(libHTML).join(''):'<li class="empty">まだ曲がありません。「＋曲を登録」から追加してください。</li>';
 }
 $('#btnAddLib').addEventListener('click',()=>{
   const s={id:uid(),title:'新しい曲',bpm:120,len:4,pa:'',light:''};
   state.lib.push(s);renderLib();renderPick();touch();
-  const li=$(`#libList [data-id="${s.id}"] .r-title`);if(li){li.focus();li.select()}
+  const li=$(`#libList [data-id="${s.id}"] .r-title`);if(li){li.scrollIntoView({block:'center'});li.focus();li.select()}
 });
 const libList=$('#libList');
 libList.addEventListener('input',e=>{
@@ -731,14 +748,6 @@ libList.addEventListener('click',e=>{
   }
 });
 
-$('#btnExportLib').addEventListener('click',()=>{
-  const now=Math.floor(Date.now()/1000);
-  state.lib.forEach(s=>{if(s.dirty||!s.rev){s.rev=now;delete s.dirty}});
-  touch();
-  const songs=state.lib.map(s=>({id:s.id,title:s.title,bpm:s.bpm,len:s.len,pa:s.pa,light:s.light,rev:s.rev}));
-  saveFile('library.json',JSON.stringify({songs},null,1));
-});
-
 /* ---------- セット図 ---------- */
 let selId=null;
 function itemHTML(it,edit){
@@ -747,7 +756,7 @@ function itemHTML(it,edit){
   const a=`class="si ${it.kind}${sel}" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%"`;
   if(it.kind==='box')return `<div ${a}><div class="bx"><div class="lb">${lb}</div>${sb}</div></div>`;
   if(it.kind==='vocal')return `<div ${a}><div class="lb">${lb}</div><svg viewBox="0 0 40 84" aria-hidden="true"><path d="M20 84V6M9 18L20 5L31 18"/><circle cx="20" cy="62" r="12"/></svg>${sb}</div>`;
-  if(it.kind==='mic')return `<div ${a}><svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="12"/><path d="M5 29L29 5"/></svg><div class="lb">${lb}</div></div>`;
+  if(it.kind==='mic')return `<div ${a}><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="19.1" cy="19.1" r="7.8"/><path d="M30.7 6.9L6.4 31.1M6.4 25.7V31.1H11.6"/></svg><div class="lb">${lb}</div></div>`;
   return `<div ${a}>${lb}</div>`;
 }
 function stageBoxHTML(edit){
@@ -904,28 +913,6 @@ ${css}
 ${pages}
 </body></html>`;
 }
-function textFor(kind){
-  const e=state.event;
-  const out=[];
-  out.push(`${e.band}${e.kana?`（${e.kana}）`:''}　${kind==='pa'?'PA要望':'照明要望'}${e.minutes!==''?`　持ち時間：${fmt(e.minutes)}分`:''}`);
-  const meta=[fmtDate(e.date),e.venue].filter(Boolean).join('　');
-  if(meta)out.push(meta);
-  if(e.seNote&&e.seText)out.push('※'+e.seText);
-  out.push('');
-  let n=0;
-  state.set.forEach(it=>{
-    const song=it.k==='song';if(song)n++;
-    out.push(`${song?n+'. ':''}${it.title}${song&&it.bpm!==''?`（BPM ${it.bpm}）`:''}${it.len?`　${fmt(it.len)}分`:''}`);
-    const req=(kind==='pa'?it.pa:it.light)||'';
-    req.split('\n').filter(l=>l.trim()).forEach(l=>out.push('　'+l));
-  });
-  out.push('退場SE');
-  if(kind==='pa')EXIT_PA.split('\n').forEach(l=>out.push('　'+l));
-  out.push('合計　'+fmt(state.set.reduce((a,i)=>a+(parseFloat(i.len)||0),0))+'分');
-  const notes=String(kind==='pa'?state.paNotes:state.lightNotes).split('\n').map(s=>s.trim()).filter(Boolean);
-  if(notes.length){out.push('');notes.forEach(l=>out.push('・'+l))}
-  return out.join('\n');
-}
 async function saveFile(filename,data){
   let dl=null;
   try{dl=await window.claude.use('downloads')}catch(e){}
@@ -933,24 +920,15 @@ async function saveFile(filename,data){
   try{await dl.save({filename,data});toast('保存しました');return true}
   catch(e){if(e&&e.code==='declined')return false;toast('保存できませんでした（'+((e&&e.code)||'error')+'）');return false}
 }
-async function copyText(t){
-  try{await navigator.clipboard.writeText(t);toast('コピーしました')}
-  catch(e){
-    const box=$('#copyBox');box.hidden=false;box.value=t;box.focus();box.select();
-    toast('自動コピーできませんでした。選択済みのテキストをコピーしてください。');
-  }
-}
 $('#btnSaveHtml').addEventListener('click',()=>{
   if(!selectedPages().length){toast('出力するページを選んでください');return}
   saveFile((fileBase()||'要望シート')+'.html',buildExport());
 });
-$('#btnCopyPa').addEventListener('click',()=>copyText(textFor('pa')));
-$('#btnCopyLight').addEventListener('click',()=>copyText(textFor('light')));
 
-/* ---------- 公演メモ・バックアップ ---------- */
+/* ---------- ライブメモ ---------- */
 function renderMemo(){
   const ul=$('#snapList');
-  ul.innerHTML=state.saved.length?state.saved.slice().reverse().map(s=>`<li data-id="${s.id}"><span class="nm">${esc(s.label)}</span><span class="at">${esc(new Date(s.at).toLocaleDateString('ja-JP'))} 保存</span><button class="btn small" type="button" data-sn="load">呼び出す</button><button class="btn small danger" type="button" data-sn="del">削除</button></li>`).join(''):'<li><span class="hint">保存した公演はまだありません。</span></li>';
+  ul.innerHTML=state.saved.length?state.saved.slice().reverse().map(s=>`<li data-id="${s.id}"><span class="nm">${esc(s.label)}</span><span class="at">${esc(new Date(s.at).toLocaleDateString('ja-JP'))} 保存</span><button class="btn small" type="button" data-sn="load">呼び出す</button><button class="btn small danger" type="button" data-sn="del">削除</button></li>`).join(''):'<li><span class="hint">保存したライブはまだありません。</span></li>';
 }
 $('#snapList').addEventListener('click',e=>{
   const b=e.target.closest('[data-sn]');if(!b)return;
@@ -974,23 +952,9 @@ $('#btnSnap').addEventListener('click',()=>{
 $('#btnNew').addEventListener('click',function(){
   arm(this,'空にする？もう一度押す',()=>{
     state.event.date='';state.event.venue='';state.set=[];
-    renderAll();touch();toast('新しい公演を始めました');
+    renderAll();touch();toast('新規シートを作成しました');
   });
 });
-$('#btnBackup').addEventListener('click',()=>{
-  saveFile('yobo-sheet-backup.json',JSON.stringify(state,null,1));
-});
-$('#fileIn').addEventListener('change',e=>{
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{
-    try{state=normalize(JSON.parse(r.result));renderAll();touch();toast('バックアップを読み込みました')}
-    catch(err){toast('読み込めませんでした。バックアップファイルを確認してください。')}
-    e.target.value='';
-  };
-  r.readAsText(f);
-});
-
 /* ---------- タブ・初期化 ---------- */
 const TABS=['set','lib','stage','preview'];
 function show(t){
